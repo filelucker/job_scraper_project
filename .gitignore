@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment files (sensitive credentials)
+.env
+.env.local
+.env.*
+.venv/
+env/
+venv/
+ENV/
+
+# OS/IDE files
+.DS_Store
+.idea/
+.vscode/
+
+# Local credentials directories
+secrets/
+*.json
+!requirements.txt
+!package.json
