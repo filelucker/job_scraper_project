@@ -13,7 +13,7 @@ from config import (
     GOOGLE_SHEET_NAME,
     GOOGLE_WORKSHEET_NAME
 )
-from handlers import GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler
+from handlers import GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler, WorkdayHandler, WorkableHandler, SmartRecruitersHandler
 from routers import TelegramRouter, GoogleSheetsRouter
 
 def fetch_board(company_name: str, board_config: dict):
@@ -35,6 +35,12 @@ def fetch_board(company_name: str, board_config: dict):
         handler = LeverHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
     elif ats_type == "ashby":
         handler = AshbyHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
+    elif ats_type == "workday":
+        handler = WorkdayHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
+    elif ats_type == "workable":
+        handler = WorkableHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
+    elif ats_type == "smartrecruiters":
+        handler = SmartRecruitersHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
     else:
         handler = FallbackHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
 

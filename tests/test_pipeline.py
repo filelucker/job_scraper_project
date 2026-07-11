@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone, timedelta
-from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job
+from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler
 from handlers.base import BaseHandler
 
 class DummyHandler(BaseHandler):
@@ -99,6 +99,76 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(job.title, "Flutter Engineer")
         self.assertEqual(job.location, "San Francisco, CA")
         self.assertEqual(job.url, "https://jobs.lever.co/lever/789")
+
+    def test_workable_handler_parsing(self):
+        handler = WorkableHandler("LoopCV", "loopcv", [])
+        raw_job = {
+            "title": "Flutter Developer",
+            "shortlink": "https://apply.workable.com/loopcv/j/123",
+            "location": {"city": "Athens", "countryName": "Greece"},
+            "published": "2026-07-11T12:00:00.000Z"
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "LoopCV")
+        self.assertEqual(job.title, "Flutter Developer")
+        self.assertEqual(job.location, "Athens, Greece")
+        self.assertEqual(job.url, "https://apply.workable.com/loopcv/j/123")
+
+    def test_smartrecruiters_handler_parsing(self):
+        handler = SmartRecruitersHandler("Wayfair", "Wayfair", [])
+        raw_job = {
+            "name": "Backend Developer",
+            "id": "106566412",
+            "location": {"fullLocation": "Boston, MA, United States"},
+            "releasedDate": "2026-07-11T14:30:00.000Z"
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Wayfair")
+        self.assertEqual(job.title, "Backend Developer")
+        self.assertEqual(job.location, "Boston, MA, United States")
+        self.assertEqual(job.url, "https://jobs.smartrecruiters.com/Wayfair/106566412")
+
+    def test_workday_handler_parsing(self):
+        handler = WorkdayHandler("eBay", "ebay.wd5.myworkdayjobs.com/wday/cxs/ebayinc/apply", [])
+        
+        # Test 1: Posted Today
+        raw_job_today = {
+            "title": "Android Engineer",
+            "externalPath": "/apply/job/123",
+            "locationsText": "Remote, US",
+            "postedOn": "Posted Today"
+        }
+        job = handler.parse_job(raw_job_today)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.title, "Android Engineer")
+        self.assertEqual(job.location, "Remote, US")
+        self.assertEqual(job.url, "https://ebay.wd5.myworkdayjobs.com/apply/job/123")
+        # Ensure timestamp is close to now
+        self.assertTrue((datetime.now(timezone.utc) - job.posted_time).total_seconds() < 60)
+        
+        # Test 2: Posted Yesterday
+        raw_job_yesterday = {
+            "title": "Backend Engineer",
+            "externalPath": "/apply/job/456",
+            "postedOn": "Posted Yesterday"
+        }
+        job_yesterday = handler.parse_job(raw_job_yesterday)
+        self.assertIsNotNone(job_yesterday)
+        delta = datetime.now(timezone.utc) - job_yesterday.posted_time
+        self.assertTrue(23 <= delta.total_seconds() / 3600 <= 25)
+
+        # Test 3: Posted 5 Days Ago
+        raw_job_5_days = {
+            "title": "Flutter Specialist",
+            "externalPath": "/apply/job/789",
+            "postedOn": "Posted 5 Days Ago"
+        }
+        job_5_days = handler.parse_job(raw_job_5_days)
+        self.assertIsNotNone(job_5_days)
+        delta_5 = datetime.now(timezone.utc) - job_5_days.posted_time
+        self.assertTrue(4.9 <= delta_5.total_seconds() / (3600 * 24) <= 5.1)
 
 if __name__ == "__main__":
     unittest.main()
