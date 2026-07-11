@@ -13,7 +13,7 @@ from config import (
     GOOGLE_SHEET_NAME,
     GOOGLE_WORKSHEET_NAME
 )
-from handlers import GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler, WorkdayHandler, WorkableHandler, SmartRecruitersHandler
+from handlers import GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, JobhiveAdapterHandler
 from routers import TelegramRouter, GoogleSheetsRouter
 
 def fetch_board(company_name: str, board_config: dict):
@@ -28,8 +28,17 @@ def fetch_board(company_name: str, board_config: dict):
             print(f"[Fallback - {company_name}] Warning: Token '{token}' is not an active RSS URL/file. Skipping stub.", file=sys.stderr)
             return company_name, [], None
 
+    # Check if the ATS type is supported by jobhive-py scrapers
+    try:
+        from jobhive.models import ATSType
+        is_jobhive_supported = ats_type in [t.value for t in ATSType]
+    except ImportError:
+        is_jobhive_supported = False
+
     # Select the appropriate ATS handler
-    if ats_type == "greenhouse":
+    if is_jobhive_supported:
+        handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type)
+    elif ats_type == "greenhouse":
         handler = GreenhouseHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
     elif ats_type == "lever":
         handler = LeverHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)

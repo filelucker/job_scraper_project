@@ -131,7 +131,7 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(job.url, "https://jobs.smartrecruiters.com/Wayfair/106566412")
 
     def test_workday_handler_parsing(self):
-        handler = WorkdayHandler("eBay", "ebay.wd5.myworkdayjobs.com/wday/cxs/ebayinc/apply", [])
+        handler = WorkdayHandler("eBay", "ebay.wd5.myworkdayjobs.com/wday/cxs/ebay/apply", [])
         
         # Test 1: Posted Today
         raw_job_today = {

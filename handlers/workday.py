@@ -7,14 +7,19 @@ class WorkdayHandler(BaseHandler):
     """Handler for companies using the Workday Recruiting portal Candidate Experience (CXS) API."""
 
     def fetch_raw_jobs(self) -> List[Dict[str, Any]]:
-        # Token is assumed to be host + path, e.g. "ebay.wd5.myworkdayjobs.com/wday/cxs/ebayinc/apply"
+        # Token is assumed to be host + path, e.g. "ebay.wd5.myworkdayjobs.com/wday/cxs/ebay/apply"
         # We need to construct:
-        # - Landing page URL: https://{host}/apply
+        # - Landing page URL: https://{host}/{site}/
         # - API URL: https://{token}/jobs
         parts = self.token.split('/')
         host = parts[0]
         
-        landing_url = f"https://{host}/apply"
+        if len(parts) >= 5:
+            site = parts[4]
+            landing_url = f"https://{host}/{site}/"
+        else:
+            landing_url = f"https://{host}/apply/"
+            
         api_url = f"https://{self.token}/jobs"
         
         session = requests.Session()
@@ -41,7 +46,7 @@ class WorkdayHandler(BaseHandler):
                 
             payload = {
                 "appliedFacets": {},
-                "limit": 100,
+                "limit": 20,
                 "offset": 0,
                 "searchText": ""
             }
