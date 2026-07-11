@@ -37,6 +37,29 @@ class GoogleSheetsRouter:
             
         return gspread.authorize(creds)
 
+    def get_existing_urls(self) -> List[str]:
+        """Fetch all existing job URLs already stored in the worksheet to prevent duplicates."""
+        if not self.credentials_json:
+            return []
+            
+        try:
+            client = self._get_client()
+            try:
+                spreadsheet = client.open(self.sheet_name)
+                worksheet = spreadsheet.worksheet(self.worksheet_name)
+            except (gspread.SpreadsheetNotFound, gspread.WorksheetNotFound):
+                return []
+                
+            # Column 4 is URL based on headers: ["Company", "Title", "Location", "URL", "Date Found"]
+            # Exclude header row if present
+            urls = worksheet.col_values(4)
+            if urls and urls[0] == "URL":
+                urls = urls[1:]
+            return [url.strip() for url in urls if url]
+        except Exception as e:
+            print(f"[Google Sheets Router] Error fetching existing URLs: {e}")
+            return []
+
     def append_jobs(self, jobs: List[Dict[str, Any]]) -> bool:
         """Append list of jobs to the target Google Sheet, creating worksheet / headers if needed."""
         if not jobs:

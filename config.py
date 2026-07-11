@@ -30,18 +30,13 @@ COMPANY_BOARDS = {
     # --- Pre-mapped Greenhouse Companies ---
     "Hubspot": {"ats": "greenhouse", "token": "hubspot"},
     "Reddit": {"ats": "greenhouse", "token": "reddit"},
-    "Yelp": {"ats": "greenhouse", "token": "yelp"},
-    "Chegg": {"ats": "greenhouse", "token": "chegg"},
-    "Clutter": {"ats": "greenhouse", "token": "clutter"},
-    "ModSquad": {"ats": "greenhouse", "token": "modsquad"},
     "GoDaddy": {"ats": "greenhouse", "token": "godaddy"},
-    "Iubenda": {"ats": "greenhouse", "token": "iubenda"},
-    "Insurity": {"ats": "greenhouse", "token": "insurity"},
-    "Uscreen": {"ats": "greenhouse", "token": "uscreen"},
     
     # --- Pre-mapped Lever Companies ---
-    "Zapier": {"ats": "greenhouse", "token": "zapier"},
-    "Truepill": {"ats": "lever", "token": "truepill"},
+    "Lever": {"ats": "lever", "token": "lever"},
+
+    # --- Pre-mapped Ashby Companies ---
+    "Zapier": {"ats": "ashby", "token": "zapier"},
 
     # --- Companies with Fallback or Custom Board configuration ---
     "1800 Flowers": {"ats": "fallback", "token": "1800flowers"},
