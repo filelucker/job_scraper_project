@@ -42,7 +42,7 @@ The project is structured with high modularity in mind. Below is an overview of 
 ## Setup Instructions
 
 ### 1. Prerequisites
-- **Python**: v3.10 or higher.
+- **Python**: v3.11 or higher.
 - **Google Cloud Platform (GCP) Project** (for Google Sheets integration).
 - **Telegram Bot** (for push alerts).
 
