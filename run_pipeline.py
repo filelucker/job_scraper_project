@@ -17,6 +17,19 @@ from config import (
 from handlers import GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, JobhiveAdapterHandler
 from routers import TelegramRouter, GoogleSheetsRouter
 
+# Pre-import key packages to avoid thread import lock contention / deadlocks during concurrent scans
+try:
+    import anyio
+    import httpcore
+    import httpx
+    from jobhive.models import ATSType
+    from jobhive.scrapers.base import get_scraper
+    JOBHIVE_AVAILABLE = True
+    JOBHIVE_ATS_TYPES = {t.value for t in ATSType}
+except ImportError:
+    JOBHIVE_AVAILABLE = False
+    JOBHIVE_ATS_TYPES = set()
+
 class TeeLogger:
     def __init__(self, log_file, original_stream):
         self.log_file = log_file
@@ -52,17 +65,15 @@ def fetch_board(company_name: str, board_config: dict):
         print(f"[Wellfound - {company_name}] Info: FIRECRAWL_API_KEY is not set. Skipping board.", file=sys.stderr)
         return company_name, [], None
 
-    # Check if the ATS type is supported by jobhive-py scrapers
-    try:
-        from jobhive.models import ATSType
-        is_jobhive_supported = ats_type in [t.value for t in ATSType]
-    except ImportError:
-        is_jobhive_supported = False
+    # Skip extremely heavy national public-sector aggregators by default to prevent long runs or hangs
+    if ats_type in ("arbetsformedlingen", "bundesagentur", "eures") and not os.getenv("ENABLE_NATIONAL_AGGREGATORS"):
+        print(f"[{company_name}] Info: National aggregator is disabled by default to prevent long execution times. Set ENABLE_NATIONAL_AGGREGATORS=1 to enable.", file=sys.stderr)
+        return company_name, [], None
 
     # Select the appropriate ATS handler
-    if is_jobhive_supported:
-        handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
-    elif ats_type == "greenhouse":
+    # We prefer optimized native handlers first for speed and timeout robustness.
+    # We fall back to the Jobhive adapter handler if no native handler is available but Jobhive supports it.
+    if ats_type == "greenhouse":
         handler = GreenhouseHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     elif ats_type == "lever":
         handler = LeverHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
@@ -74,6 +85,8 @@ def fetch_board(company_name: str, board_config: dict):
         handler = WorkableHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     elif ats_type == "smartrecruiters":
         handler = SmartRecruitersHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+    elif JOBHIVE_AVAILABLE and ats_type in JOBHIVE_ATS_TYPES:
+        handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     else:
         handler = FallbackHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
 
@@ -101,8 +114,9 @@ def main():
 
         all_matched_jobs = []
 
-        # Run scans concurrently in a thread pool to avoid sequential execution bottlenecks
-        max_workers = min(10, len(COMPANY_BOARDS))
+        # Run scans concurrently in a thread pool to avoid sequential execution bottlenecks.
+        # We increase concurrency from 10 to 40 since the pipeline is network I/O bound.
+        max_workers = min(40, len(COMPANY_BOARDS))
         print(f"Scanning boards concurrently with up to {max_workers} threads...")
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:

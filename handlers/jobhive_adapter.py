@@ -26,8 +26,9 @@ class JobhiveAdapterHandler(BaseHandler):
                 elif not self.token.startswith("https://") and not self.token.startswith("http://"):
                     scraper_token = f"https://{self.token}"
 
-            # Instantiate the correct jobhive scraper using its registration name/enum
-            scraper = get_scraper(self.ats_type, scraper_token)
+            # Instantiate the correct jobhive scraper using its registration name/enum.
+            # We set a shorter 15.0s timeout to prevent individual slow boards from dragging down the pipeline.
+            scraper = get_scraper(self.ats_type, scraper_token, timeout=15.0)
             # Disable descriptions retrieval to optimize network latency & speed up queries
             scraper.include_descriptions = False
             
