@@ -11,6 +11,12 @@ load_dotenv()
 KEYWORDS = [
     "Flutter",
     "Android",
+    "AI App Developer",
+    "AI Mobile Developer",
+    "Mobile AI Engineer",
+    "GenAI Application Developer",
+    "AI Integration Engineer",
+    "LLM Application Developer",
     "AI/ML",
     "Reactjs",
     "Backend",
@@ -19,6 +25,10 @@ KEYWORDS = [
 
 # Time limit in hours for jobs posted
 JOB_LOOKBACK_HOURS = 24
+
+# Location filtering: If True, only jobs matching 'remote' or 'hybrid' in location/title are processed
+ONLY_REMOTE_OR_HYBRID = True
+
 
 # ==========================================
 # 2. Portal Mappings

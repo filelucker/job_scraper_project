@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from config import (
     KEYWORDS,
     JOB_LOOKBACK_HOURS,
+    ONLY_REMOTE_OR_HYBRID,
     COMPANY_BOARDS,
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
@@ -37,21 +38,21 @@ def fetch_board(company_name: str, board_config: dict):
 
     # Select the appropriate ATS handler
     if is_jobhive_supported:
-        handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type)
+        handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     elif ats_type == "greenhouse":
-        handler = GreenhouseHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
+        handler = GreenhouseHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     elif ats_type == "lever":
-        handler = LeverHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
+        handler = LeverHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     elif ats_type == "ashby":
-        handler = AshbyHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
+        handler = AshbyHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     elif ats_type == "workday":
-        handler = WorkdayHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
+        handler = WorkdayHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     elif ats_type == "workable":
-        handler = WorkableHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
+        handler = WorkableHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     elif ats_type == "smartrecruiters":
-        handler = SmartRecruitersHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
+        handler = SmartRecruitersHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     else:
-        handler = FallbackHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS)
+        handler = FallbackHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
 
     try:
         matched_jobs = handler.execute()

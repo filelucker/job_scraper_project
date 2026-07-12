@@ -8,8 +8,8 @@ from jobhive.models import ATSType
 class JobhiveAdapterHandler(BaseHandler):
     """Handler that wraps jobhive-py scrapers to support Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Workday, etc."""
     
-    def __init__(self, company_name: str, token: str, keywords: List[str], lookback_hours: int = 24, ats_type: str = ""):
-        super().__init__(company_name, token, keywords, lookback_hours)
+    def __init__(self, company_name: str, token: str, keywords: List[str], lookback_hours: int = 24, ats_type: str = "", only_remote_or_hybrid: bool = False):
+        super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid)
         self.ats_type = ats_type
 
     def execute(self) -> List[Job]:
@@ -49,6 +49,10 @@ class JobhiveAdapterHandler(BaseHandler):
                     
                 # Apply target tracking keyword matching
                 if not self.matches_keywords(title):
+                    continue
+                    
+                # Apply location filtering if enabled
+                if not self.matches_location(location, title):
                     continue
                     
                 # Handle posting date / timezone alignment

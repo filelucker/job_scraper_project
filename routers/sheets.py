@@ -85,11 +85,11 @@ class GoogleSheetsRouter:
                 worksheet = spreadsheet.worksheet(self.worksheet_name)
             except gspread.WorksheetNotFound:
                 print(f"[Google Sheets Router] Worksheet '{self.worksheet_name}' not found. Creating it.")
-                worksheet = spreadsheet.add_worksheet(title=self.worksheet_name, rows="1000", cols="5")
+                worksheet = spreadsheet.add_worksheet(title=self.worksheet_name, rows="1000", cols="6")
                 
             # If worksheet is brand new/empty, initialize headers
             existing_records = worksheet.get_all_values()
-            headers = ["Company", "Title", "Location", "URL", "Date Found"]
+            headers = ["Company", "Title", "Location", "URL", "Actual Post Date", "Date Found"]
             
             if not existing_records:
                 worksheet.append_row(headers)
@@ -102,6 +102,7 @@ class GoogleSheetsRouter:
                     job.get("Title", ""),
                     job.get("Location", ""),
                     job.get("URL", ""),
+                    job.get("Actual Post Date", ""),
                     job.get("Date Found", "")
                 ])
                 

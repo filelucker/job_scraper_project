@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 
 class Job:
@@ -13,12 +13,20 @@ class Job:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert job representation to a dictionary for routers."""
+        bst = timezone(timedelta(hours=6))
+        if self.posted_time.tzinfo is None:
+            actual_post_bst = self.posted_time.replace(tzinfo=timezone.utc).astimezone(bst)
+        else:
+            actual_post_bst = self.posted_time.astimezone(bst)
+        date_found_bst = datetime.now(timezone.utc).astimezone(bst)
+        
         return {
             "Company": self.company,
             "Title": self.title,
             "Location": self.location,
             "URL": self.url,
-            "Date Found": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            "Actual Post Date": actual_post_bst.strftime("%Y-%m-%d %H:%M:%S BST"),
+            "Date Found": date_found_bst.strftime("%Y-%m-%d %H:%M:%S BST")
         }
 
     def __repr__(self) -> str:
@@ -27,11 +35,13 @@ class Job:
 
 class BaseHandler:
     """Abstract base class for all job board handlers."""
-    def __init__(self, company_name: str, token: str, keywords: List[str], lookback_hours: int = 24):
+    def __init__(self, company_name: str, token: str, keywords: List[str], lookback_hours: int = 24, only_remote_or_hybrid: bool = False):
         self.company_name = company_name
         self.token = token
         self.keywords = keywords
         self.lookback_hours = lookback_hours
+        self.only_remote_or_hybrid = only_remote_or_hybrid
+
 
     def fetch_raw_jobs(self) -> List[Dict[str, Any]]:
         """Fetch raw jobs from the target API. Must be implemented by subclasses."""
@@ -57,6 +67,17 @@ class BaseHandler:
             if re.search(pattern, title, re.IGNORECASE):
                 return True
         return False
+    def matches_location(self, location: str, title: str) -> bool:
+        """
+        Check if the job matches the location filters (Remote / Hybrid) if enabled.
+        """
+        if not self.only_remote_or_hybrid:
+            return True
+        
+        loc_lower = (location or "").lower()
+        title_lower = (title or "").lower()
+        
+        return "remote" in loc_lower or "hybrid" in loc_lower or "remote" in title_lower or "hybrid" in title_lower
 
     def is_within_lookback(self, posted_time: datetime) -> bool:
         """Verify if the job posting was created/updated within the lookback window."""
@@ -84,8 +105,10 @@ class BaseHandler:
                 if not job:
                     continue
                 
-                # Apply filters: title and posting date
-                if self.matches_keywords(job.title) and self.is_within_lookback(job.posted_time):
+                # Apply filters: title, posting date, and location
+                if (self.matches_keywords(job.title) and 
+                    self.is_within_lookback(job.posted_time) and 
+                    self.matches_location(job.location, job.title)):
                     matching_jobs.append(job)
             except Exception as e:
                 # Log parsing errors but don't fail the overall run

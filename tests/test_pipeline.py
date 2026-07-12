@@ -45,6 +45,38 @@ class TestPipeline(unittest.TestCase):
         naive_time = (datetime.now(timezone.utc) - timedelta(hours=2)).replace(tzinfo=None)
         self.assertTrue(handler.is_within_lookback(naive_time))
 
+    def test_location_filtering(self):
+        # 1. Location filtering disabled
+        handler_no_filter = DummyHandler("TestCo", "token", [], only_remote_or_hybrid=False)
+        self.assertTrue(handler_no_filter.matches_location("New York, NY", "Developer"))
+        self.assertTrue(handler_no_filter.matches_location("Remote", "Developer"))
+
+        # 2. Location filtering enabled
+        handler_filtered = DummyHandler("TestCo", "token", [], only_remote_or_hybrid=True)
+        # Matches 'remote' in location
+        self.assertTrue(handler_filtered.matches_location("Remote, USA", "Developer"))
+        self.assertTrue(handler_filtered.matches_location("remote", "Developer"))
+        # Matches 'hybrid' in location
+        self.assertTrue(handler_filtered.matches_location("Hybrid - San Francisco", "Developer"))
+        # Matches 'remote' or 'hybrid' in title
+        self.assertTrue(handler_filtered.matches_location("New York, NY", "Remote Developer"))
+        self.assertTrue(handler_filtered.matches_location("London, UK", "Hybrid Software Engineer"))
+        # Does NOT match
+        self.assertFalse(handler_filtered.matches_location("New York, NY", "Developer"))
+        self.assertFalse(handler_filtered.matches_location("", "Developer"))
+
+    def test_job_to_dict_formatting(self):
+        posted_time = datetime(2026, 7, 11, 12, 0, 0, tzinfo=timezone.utc)
+        job = Job("TestCo", "Developer", "Remote", "https://example.com", posted_time)
+        job_dict = job.to_dict()
+        
+        self.assertEqual(job_dict["Company"], "TestCo")
+        self.assertEqual(job_dict["Title"], "Developer")
+        self.assertEqual(job_dict["Location"], "Remote")
+        self.assertEqual(job_dict["URL"], "https://example.com")
+        self.assertEqual(job_dict["Actual Post Date"], "2026-07-11 18:00:00 BST")
+        self.assertTrue(job_dict["Date Found"].endswith("BST"))
+
     def test_ashby_handler_parsing(self):
         handler = AshbyHandler("Zapier", "zapier", ["AI/ML"])
         
