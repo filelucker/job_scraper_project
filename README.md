@@ -92,9 +92,15 @@ GOOGLE_WORKSHEET_NAME="Jobs"
 ## Usage
 
 ### Run Locally
-Simply trigger the main script:
+To run the job scraper pipeline locally:
 ```bash
 python run_pipeline.py
+```
+
+### Run Tests
+To run the project unit tests locally:
+```bash
+python -m unittest tests/test_pipeline.py
 ```
 
 ### Modifying Job Boards

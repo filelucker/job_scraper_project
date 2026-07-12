@@ -85,11 +85,11 @@ class GoogleSheetsRouter:
                 worksheet = spreadsheet.worksheet(self.worksheet_name)
             except gspread.WorksheetNotFound:
                 print(f"[Google Sheets Router] Worksheet '{self.worksheet_name}' not found. Creating it.")
-                worksheet = spreadsheet.add_worksheet(title=self.worksheet_name, rows="1000", cols="6")
+                worksheet = spreadsheet.add_worksheet(title=self.worksheet_name, rows="1000", cols="7")
                 
             # If worksheet is brand new/empty, initialize headers
             existing_records = worksheet.get_all_values()
-            headers = ["Company", "Title", "Location", "URL", "Actual Post Date", "Date Found"]
+            headers = ["Company", "Title", "Location", "URL", "Actual Post Date", "Date Found", "this job accepts candidate worldwide or not"]
             
             if not existing_records:
                 worksheet.append_row(headers)
@@ -97,13 +97,17 @@ class GoogleSheetsRouter:
             # Prepare rows to append
             rows_to_append = []
             for job in jobs:
+                loc_lower = job.get("Location", "").lower()
+                is_worldwide = "worldwide" in loc_lower or "global" in loc_lower or "anywhere" in loc_lower
+                worldwide_val = "Yes" if is_worldwide else "No"
                 rows_to_append.append([
                     job.get("Company", ""),
                     job.get("Title", ""),
                     job.get("Location", ""),
                     job.get("URL", ""),
                     job.get("Actual Post Date", ""),
-                    job.get("Date Found", "")
+                    job.get("Date Found", ""),
+                    worldwide_val
                 ])
                 
             # Perform bulk append

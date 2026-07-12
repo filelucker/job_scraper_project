@@ -202,5 +202,72 @@ class TestPipeline(unittest.TestCase):
         delta_5 = datetime.now(timezone.utc) - job_5_days.posted_time
         self.assertTrue(4.9 <= delta_5.total_seconds() / (3600 * 24) <= 5.1)
 
+    def test_google_sheets_router_worldwide_column(self):
+        from unittest.mock import MagicMock, patch
+        from routers import GoogleSheetsRouter
+        
+        # Instantiate with valid looking mock JSON creds
+        router = GoogleSheetsRouter('{"type": "service_account"}', "Test Sheet", "Jobs")
+        
+        mock_client = MagicMock()
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        
+        mock_client.open.return_value = mock_spreadsheet
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_worksheet.get_all_values.return_value = [] # brand new worksheet
+        
+        jobs_payload = [
+            {"Company": "TestCo1", "Title": "Eng", "Location": "Worldwide Remote", "URL": "http://1", "Actual Post Date": "2026-07-12", "Date Found": "2026-07-12"},
+            {"Company": "TestCo2", "Title": "Eng", "Location": "New York, NY", "URL": "http://2", "Actual Post Date": "2026-07-12", "Date Found": "2026-07-12"}
+        ]
+        
+        with patch.object(router, '_get_client', return_value=mock_client):
+            success = router.append_jobs(jobs_payload)
+            self.assertTrue(success)
+            
+            # Check headers written
+            expected_headers = ["Company", "Title", "Location", "URL", "Actual Post Date", "Date Found", "this job accepts candidate worldwide or not"]
+            mock_worksheet.append_row.assert_called_once_with(expected_headers)
+            
+            # Check values appended
+            args, kwargs = mock_worksheet.append_rows.call_args
+            appended_rows = args[0]
+            self.assertEqual(len(appended_rows), 2)
+            self.assertEqual(appended_rows[0][6], "Yes") # Worldwide Remote
+            self.assertEqual(appended_rows[1][6], "No")  # New York, NY
+
+    def test_telegram_router_send_document(self):
+        from unittest.mock import patch, MagicMock
+        from routers import TelegramRouter
+        
+        router = TelegramRouter("mock_token", "mock_chat_id")
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        
+        with patch("requests.post", return_value=mock_response) as mock_post:
+            # We can write a dummy file to test
+            dummy_file = "dummy_run.log"
+            with open(dummy_file, "w") as f:
+                f.write("test log")
+                
+            try:
+                success = router.send_document(dummy_file, caption="Test log file")
+                self.assertTrue(success)
+                
+                # Verify requests.post was called with the correct URL
+                expected_url = "https://api.telegram.org/botmock_token/sendDocument"
+                mock_post.assert_called_once()
+                args, kwargs = mock_post.call_args
+                self.assertEqual(args[0], expected_url)
+                self.assertEqual(kwargs["data"]["chat_id"], "mock_chat_id")
+                self.assertEqual(kwargs["data"]["caption"], "Test log file")
+                self.assertIn("document", kwargs["files"])
+            finally:
+                import os
+                if os.path.exists(dummy_file):
+                    os.remove(dummy_file)
+
 if __name__ == "__main__":
     unittest.main()

@@ -82,3 +82,25 @@ class TelegramRouter:
                     print(f"[Telegram Router] Fallback sending failed: {e_inner}")
                     success = False
         return success
+
+    def send_document(self, file_path: str, caption: str = "") -> bool:
+        """Send a local file as a document via Telegram API."""
+        if not self.bot_token or not self.chat_id:
+            print("[Telegram Router] Missing bot token or chat ID. Skipping document upload.")
+            return False
+
+        url = f"https://api.telegram.org/bot{self.bot_token}/sendDocument"
+        try:
+            with open(file_path, "rb") as f:
+                files = {"document": f}
+                data = {
+                    "chat_id": self.chat_id,
+                    "caption": caption[:1024]  # Telegram limits caption to 1024 chars
+                }
+                response = requests.post(url, data=data, files=files, timeout=30)
+                response.raise_for_status()
+                return True
+        except Exception as e:
+            print(f"[Telegram Router] Failed to send document: {e}")
+            return False
+
