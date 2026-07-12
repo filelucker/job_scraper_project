@@ -60,6 +60,17 @@ class GoogleSheetsRouter:
             print(f"[Google Sheets Router] Error fetching existing URLs: {e}")
             return []
 
+    def _convert_to_am_pm(self, time_str: str) -> str:
+        """Convert a 24-hour time string like '2026-07-12 21:33:01 BST' to 12-hour AM/PM format '2026-07-12 09:33:01 PM BST'."""
+        if not time_str:
+            return ""
+        try:
+            from datetime import datetime
+            dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S BST")
+            return dt.strftime("%Y-%m-%d %I:%M:%S %p BST")
+        except Exception:
+            return time_str
+
     def append_jobs(self, jobs: List[Dict[str, Any]]) -> bool:
         """Append list of jobs to the target Google Sheet, creating worksheet / headers if needed."""
         if not jobs:
@@ -105,8 +116,8 @@ class GoogleSheetsRouter:
                     job.get("Title", ""),
                     job.get("Location", ""),
                     job.get("URL", ""),
-                    job.get("Actual Post Date", ""),
-                    job.get("Date Found", ""),
+                    self._convert_to_am_pm(job.get("Actual Post Date", "")),
+                    self._convert_to_am_pm(job.get("Date Found", "")),
                     worldwide_val
                 ])
                 

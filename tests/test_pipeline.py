@@ -218,7 +218,7 @@ class TestPipeline(unittest.TestCase):
         mock_worksheet.get_all_values.return_value = [] # brand new worksheet
         
         jobs_payload = [
-            {"Company": "TestCo1", "Title": "Eng", "Location": "Worldwide Remote", "URL": "http://1", "Actual Post Date": "2026-07-12", "Date Found": "2026-07-12"},
+            {"Company": "TestCo1", "Title": "Eng", "Location": "Worldwide Remote", "URL": "http://1", "Actual Post Date": "2026-07-12 21:33:01 BST", "Date Found": "2026-07-12 21:33:01 BST"},
             {"Company": "TestCo2", "Title": "Eng", "Location": "New York, NY", "URL": "http://2", "Actual Post Date": "2026-07-12", "Date Found": "2026-07-12"}
         ]
         
@@ -234,6 +234,13 @@ class TestPipeline(unittest.TestCase):
             args, kwargs = mock_worksheet.append_rows.call_args
             appended_rows = args[0]
             self.assertEqual(len(appended_rows), 2)
+            # Check date conversion to AM/PM format
+            self.assertEqual(appended_rows[0][4], "2026-07-12 09:33:01 PM BST")
+            self.assertEqual(appended_rows[0][5], "2026-07-12 09:33:01 PM BST")
+            # Check graceful fallback on invalid/non-standard format
+            self.assertEqual(appended_rows[1][4], "2026-07-12")
+            self.assertEqual(appended_rows[1][5], "2026-07-12")
+            
             self.assertEqual(appended_rows[0][6], "Yes") # Worldwide Remote
             self.assertEqual(appended_rows[1][6], "No")  # New York, NY
 
