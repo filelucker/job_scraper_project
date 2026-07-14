@@ -7,9 +7,11 @@ from handlers.workday import WorkdayHandler
 from handlers.workable import WorkableHandler
 from handlers.smartrecruiters import SmartRecruitersHandler
 from handlers.jobhive_adapter import JobhiveAdapterHandler
+from handlers.adzuna import AdzunaHandler
+from handlers.jooble import JoobleHandler
 
 __all__ = [
     "BaseHandler", "Job", "GreenhouseHandler", "LeverHandler", "FallbackHandler",
     "AshbyHandler", "WorkdayHandler", "WorkableHandler", "SmartRecruitersHandler",
-    "JobhiveAdapterHandler"
+    "JobhiveAdapterHandler", "AdzunaHandler", "JoobleHandler"
 ]

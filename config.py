@@ -210,6 +210,35 @@ COMPANY_BOARDS = {
     'lyft': {'ats': 'greenhouse', 'token': 'lyft'},
     'whatsapp': {'ats': 'workable', 'token': 'whatsapp'},
 
+    # --- Added Direct Boards ---
+    'Vanta': {'ats': 'lever', 'token': 'vanta'},
+    'Retool': {'ats': 'greenhouse', 'token': 'retool'},
+    'Replit': {'ats': 'greenhouse', 'token': 'replit'},
+    'Plaid': {'ats': 'greenhouse', 'token': 'plaid'},
+    'Verkada': {'ats': 'greenhouse', 'token': 'verkada'},
+    'Scale AI': {'ats': 'greenhouse', 'token': 'scaleai'},
+    'Hex': {'ats': 'greenhouse', 'token': 'hex'},
+    'Harness': {'ats': 'greenhouse', 'token': 'harness'},
+    'Postman': {'ats': 'lever', 'token': 'postman'},
+    'Faire': {'ats': 'greenhouse', 'token': 'faire'},
+    'Checkr': {'ats': 'greenhouse', 'token': 'checkr'},
+    'Remote': {'ats': 'greenhouse', 'token': 'remote'},
+    'Oyster': {'ats': 'greenhouse', 'token': 'oyster'},
+    'Weaviate': {'ats': 'greenhouse', 'token': 'weaviate'},
+    'Weights & Biases': {'ats': 'greenhouse', 'token': 'wandb'},
+    'Anysphere': {'ats': 'greenhouse', 'token': 'anysphere'},
+    'Replicate': {'ats': 'greenhouse', 'token': 'replicate'},
+    'Writer': {'ats': 'greenhouse', 'token': 'writer'},
+    'Superhuman': {'ats': 'greenhouse', 'token': 'superhuman'},
+    'Drata': {'ats': 'greenhouse', 'token': 'drata'},
+    'Lacework': {'ats': 'greenhouse', 'token': 'lacework'},
+    'Orca Security': {'ats': 'greenhouse', 'token': 'orcasecurity'},
+    'Whimsical': {'ats': 'ashby', 'token': 'whimsical'},
+    'Raycast': {'ats': 'lever', 'token': 'raycast'},
+    'Webflow': {'ats': 'greenhouse', 'token': 'webflow'},
+    'Tailscale': {'ats': 'greenhouse', 'token': 'tailscale'},
+    'Railway': {'ats': 'ashby', 'token': 'railway'},
+
     # --- National Public-Sector Aggregators ---
     'Arbetsförmedlingen (SE)': {'ats': 'arbetsformedlingen', 'token': 'arbetsformedlingen'},
     'Bundesagentur (DE)': {'ats': 'bundesagentur', 'token': 'bundesagentur'},
@@ -222,6 +251,8 @@ COMPANY_BOARDS = {
     'RemoteOK': {'ats': 'remoteok', 'token': '*'},
     'Wellfound': {'ats': 'wellfound', 'token': '*'},
     'Y Combinator': {'ats': 'ycombinator', 'token': '*'},
+    'Adzuna': {'ats': 'adzuna', 'token': '*'},
+    'Jooble': {'ats': 'jooble', 'token': '*'},
 }
 
 # ==========================================
@@ -236,3 +267,10 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "Job Scraper Results")
 GOOGLE_WORKSHEET_NAME = os.getenv("GOOGLE_WORKSHEET_NAME", "Jobs")
+
+# Adzuna API configuration
+ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID")
+ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY")
+
+# Jooble API configuration
+JOOBLE_API_KEY = os.getenv("JOOBLE_API_KEY")

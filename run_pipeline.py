@@ -12,9 +12,16 @@ from config import (
     TELEGRAM_CHAT_ID,
     GOOGLE_CREDENTIALS_JSON,
     GOOGLE_SHEET_NAME,
-    GOOGLE_WORKSHEET_NAME
+    GOOGLE_WORKSHEET_NAME,
+    ADZUNA_APP_ID,
+    ADZUNA_APP_KEY,
+    JOOBLE_API_KEY
 )
-from handlers import GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, JobhiveAdapterHandler
+from handlers import (
+    GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler,
+    WorkdayHandler, WorkableHandler, SmartRecruitersHandler, JobhiveAdapterHandler,
+    AdzunaHandler, JoobleHandler
+)
 from routers import TelegramRouter, GoogleSheetsRouter
 
 # Pre-import key packages to avoid thread import lock contention / deadlocks during concurrent scans
@@ -114,6 +121,14 @@ def fetch_board(company_name: str, board_config: dict):
         print(f"[Wellfound - {company_name}] Info: FIRECRAWL_API_KEY is not set. Skipping board.", file=sys.stderr)
         return company_name, [], "skipped", None
 
+    if ats_type == "adzuna" and (not ADZUNA_APP_ID or not ADZUNA_APP_KEY):
+        print(f"[Adzuna - {company_name}] Info: ADZUNA_APP_ID or ADZUNA_APP_KEY is not set. Skipping board.", file=sys.stderr)
+        return company_name, [], "skipped", None
+
+    if ats_type == "jooble" and not JOOBLE_API_KEY:
+        print(f"[Jooble - {company_name}] Info: JOOBLE_API_KEY is not set. Skipping board.", file=sys.stderr)
+        return company_name, [], "skipped", None
+
     # Skip extremely heavy national public-sector aggregators by default to prevent long runs or hangs
     if ats_type in ("arbetsformedlingen", "bundesagentur", "eures") and not os.getenv("ENABLE_NATIONAL_AGGREGATORS"):
         print(f"[{company_name}] Info: National aggregator is disabled by default to prevent long execution times. Set ENABLE_NATIONAL_AGGREGATORS=1 to enable.", file=sys.stderr)
@@ -134,6 +149,10 @@ def fetch_board(company_name: str, board_config: dict):
         handler = WorkableHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     elif ats_type == "smartrecruiters":
         handler = SmartRecruitersHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+    elif ats_type == "adzuna":
+        handler = AdzunaHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, app_id=ADZUNA_APP_ID, app_key=ADZUNA_APP_KEY)
+    elif ats_type == "jooble":
+        handler = JoobleHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, api_key=JOOBLE_API_KEY)
     elif JOBHIVE_AVAILABLE and ats_type in JOBHIVE_ATS_TYPES:
         handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     else:

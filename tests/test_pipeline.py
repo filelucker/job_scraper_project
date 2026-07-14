@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone, timedelta
-from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler
+from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler
 from handlers.base import BaseHandler
 
 class DummyHandler(BaseHandler):
@@ -326,6 +326,38 @@ class TestPipeline(unittest.TestCase):
         )
         self.assertIn("A very long error message that exceeds", summary_with_trunc)
         self.assertTrue(summary_with_trunc.endswith("..."))
+
+    def test_adzuna_handler_parsing(self):
+        handler = AdzunaHandler("Adzuna", "*", ["Flutter"], app_id="test_id", app_key="test_key")
+        raw_job = {
+            "title": "<strong>Flutter</strong> Developer",
+            "company": {"display_name": "Test Company"},
+            "redirect_url": "https://example.com/job",
+            "location": {"display_name": "Remote, USA"},
+            "created": "2026-07-14T08:00:00Z"
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Test Company")
+        self.assertEqual(job.title, "Flutter Developer")
+        self.assertEqual(job.location, "Remote, USA")
+        self.assertEqual(job.url, "https://example.com/job")
+
+    def test_jooble_handler_parsing(self):
+        handler = JoobleHandler("Jooble", "*", ["Flutter"], api_key="test_key")
+        raw_job = {
+            "title": "<b>Flutter</b> Engineer",
+            "company": "Test Company",
+            "link": "https://example.com/job",
+            "location": "Remote",
+            "updated": "2026-07-14T08:00:00.0000000+03:00"
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Test Company")
+        self.assertEqual(job.title, "Flutter Engineer")
+        self.assertEqual(job.location, "Remote")
+        self.assertEqual(job.url, "https://example.com/job")
 
 if __name__ == "__main__":
     unittest.main()
