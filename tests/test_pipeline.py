@@ -276,5 +276,56 @@ class TestPipeline(unittest.TestCase):
                 if os.path.exists(dummy_file):
                     os.remove(dummy_file)
 
+    def test_telegram_router_format_run_summary(self):
+        from routers import TelegramRouter
+        router = TelegramRouter("mock_token", "mock_chat_id")
+        
+        # Test summary format without failures
+        summary = router.format_run_summary(
+            duration_seconds=75.5,
+            total_configured=10,
+            scanned_count=8,
+            skipped_count=2,
+            failed_boards=[],
+            total_found=5,
+            total_new=2
+        )
+        
+        self.assertIn("Job Scraper Run Summary", summary)
+        self.assertIn("1m 15s", summary)
+        self.assertIn("*Total Boards*: 10", summary)
+        self.assertIn("*Scanned*: 8", summary)
+        self.assertIn("*Skipped*: 2", summary)
+        self.assertIn("*Jobs Matched*: 5", summary)
+        self.assertIn("*New Jobs Added*: 2", summary)
+        self.assertNotIn("Failed Boards:", summary)
+
+        # Test summary format with failures (no truncation)
+        summary_with_fail = router.format_run_summary(
+            duration_seconds=30.0,
+            total_configured=5,
+            scanned_count=3,
+            skipped_count=1,
+            failed_boards=[("ErrorCo", "HTTP Connection Timeout to endpoint 500")],
+            total_found=0,
+            total_new=0
+        )
+        self.assertIn("Failed Boards:", summary_with_fail)
+        self.assertIn("ErrorCo", summary_with_fail)
+        self.assertIn("HTTP Connection Timeout to endpoint 500", summary_with_fail)
+
+        # Test summary format with failures (with truncation)
+        summary_with_trunc = router.format_run_summary(
+            duration_seconds=30.0,
+            total_configured=5,
+            scanned_count=3,
+            skipped_count=1,
+            failed_boards=[("ErrorCo", "A very long error message that exceeds sixty characters to test the truncation logic in our router")],
+            total_found=0,
+            total_new=0
+        )
+        self.assertIn("A very long error message that exceeds", summary_with_trunc)
+        self.assertTrue(summary_with_trunc.endswith("..."))
+
 if __name__ == "__main__":
     unittest.main()

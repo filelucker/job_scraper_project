@@ -30,13 +30,62 @@ except ImportError:
     JOBHIVE_AVAILABLE = False
     JOBHIVE_ATS_TYPES = set()
 
+
+# --- Monkeypatch requests to limit per-host concurrent connections and add timeout/stagger safeguards ---
+import requests
+import threading
+import time
+import random
+from collections import defaultdict
+from urllib.parse import urlparse
+
+_host_locks = defaultdict(threading.Lock)
+_host_counts = defaultdict(int)
+MAX_PER_HOST = 2
+
+_original_session_request = requests.Session.request
+
+def _get_host(url):
+    try:
+        return urlparse(url).hostname or "unknown"
+    except Exception:
+        return "unknown"
+
+def patched_session_request(self, method, url, *args, **kwargs):
+    host = _get_host(url)
+    
+    # Introduce small random stagger delay to spread requests
+    time.sleep(random.uniform(0.1, 0.4))
+    
+    while True:
+        with _host_locks[host]:
+            if _host_counts[host] < MAX_PER_HOST:
+                _host_counts[host] += 1
+                break
+        time.sleep(0.2)
+        
+    try:
+        if 'timeout' not in kwargs:
+            kwargs['timeout'] = 30
+        return _original_session_request(self, method, url, *args, **kwargs)
+    finally:
+        with _host_locks[host]:
+            _host_counts[host] -= 1
+
+requests.Session.request = patched_session_request
+
 class TeeLogger:
     def __init__(self, log_file, original_stream):
         self.log_file = log_file
         self.original_stream = original_stream
 
     def write(self, data):
-        self.original_stream.write(data)
+        try:
+            self.original_stream.write(data)
+        except UnicodeEncodeError:
+            encoding = getattr(self.original_stream, 'encoding', 'utf-8') or 'utf-8'
+            clean_data = data.encode(encoding, errors='replace').decode(encoding)
+            self.original_stream.write(clean_data)
         self.log_file.write(data)
         self.log_file.flush()
 
@@ -54,21 +103,21 @@ def fetch_board(company_name: str, board_config: dict):
         is_rss = token.startswith("http://") or token.startswith("https://") or token.endswith(".xml")
         if not is_rss:
             print(f"[Fallback - {company_name}] Warning: Token '{token}' is not an active RSS URL/file. Skipping stub.", file=sys.stderr)
-            return company_name, [], None
+            return company_name, [], "skipped", None
 
     # Skip boards requiring missing API keys to prevent logs cluttering
     if ats_type == "usajobs" and not os.getenv("USAJOBS_API_KEY"):
         print(f"[USAJobs - {company_name}] Info: USAJOBS_API_KEY is not set. Skipping board.", file=sys.stderr)
-        return company_name, [], None
+        return company_name, [], "skipped", None
 
     if ats_type == "wellfound" and not os.getenv("FIRECRAWL_API_KEY"):
         print(f"[Wellfound - {company_name}] Info: FIRECRAWL_API_KEY is not set. Skipping board.", file=sys.stderr)
-        return company_name, [], None
+        return company_name, [], "skipped", None
 
     # Skip extremely heavy national public-sector aggregators by default to prevent long runs or hangs
     if ats_type in ("arbetsformedlingen", "bundesagentur", "eures") and not os.getenv("ENABLE_NATIONAL_AGGREGATORS"):
         print(f"[{company_name}] Info: National aggregator is disabled by default to prevent long execution times. Set ENABLE_NATIONAL_AGGREGATORS=1 to enable.", file=sys.stderr)
-        return company_name, [], None
+        return company_name, [], "skipped", None
 
     # Select the appropriate ATS handler
     # We prefer optimized native handlers first for speed and timeout robustness.
@@ -92,13 +141,24 @@ def fetch_board(company_name: str, board_config: dict):
 
     try:
         matched_jobs = handler.execute()
-        return company_name, matched_jobs, None
+        return company_name, matched_jobs, "scanned", None
     except Exception as e:
-        return company_name, [], e
+        return company_name, [], "failed", e
 
 def main():
+    start_time = datetime.now()
+    scanned_boards = []
+    skipped_boards = []
+    failed_boards = []
+    all_matched_jobs = []
+    new_jobs = []
+
     log_filename = "pipeline.log"
-    log_file = open(log_filename, "w", encoding="utf-8")
+    try:
+        log_file = open(log_filename, "w", encoding="utf-8")
+    except Exception as e:
+        print(f"Failed to open log file: {e}", file=sys.stderr)
+        return
     
     original_stdout = sys.stdout
     original_stderr = sys.stderr
@@ -112,11 +172,9 @@ def main():
         print(f"Lookback Window: {JOB_LOOKBACK_HOURS} hours")
         print(f"Scanning {len(COMPANY_BOARDS)} company job boards...\n")
 
-        all_matched_jobs = []
-
         # Run scans concurrently in a thread pool to avoid sequential execution bottlenecks.
-        # We increase concurrency from 10 to 40 since the pipeline is network I/O bound.
-        max_workers = min(40, len(COMPANY_BOARDS))
+        # We limit concurrency to 10 to avoid triggering rate-limiting WAF (Cloudflare) blocks.
+        max_workers = min(10, len(COMPANY_BOARDS))
         print(f"Scanning boards concurrently with up to {max_workers} threads...")
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -128,20 +186,25 @@ def main():
             for future in concurrent.futures.as_completed(future_to_board):
                 company_name = future_to_board[future]
                 try:
-                    company_name, matched_jobs, err = future.result()
-                    if err:
+                    company_name, matched_jobs, status, err = future.result()
+                    if status == "failed":
                         print(f"[ERROR] Fail-safe caught exception while scanning board for '{company_name}': {err}", file=sys.stderr)
-                    elif matched_jobs:
-                        print(f"[{company_name}] Found {len(matched_jobs)} matching job(s) posted in the last 24 hours!")
-                        for job in matched_jobs:
-                            print(f"  - {job.title} ({job.location}) -> {job.url}")
-                        all_matched_jobs.extend(matched_jobs)
+                        failed_boards.append((company_name, str(err)))
+                    elif status == "skipped":
+                        skipped_boards.append(company_name)
+                    else:
+                        scanned_boards.append(company_name)
+                        if matched_jobs:
+                            print(f"[{company_name}] Found {len(matched_jobs)} matching job(s) posted in the last 24 hours!")
+                            for job in matched_jobs:
+                                print(f"  - {job.title} ({job.location}) -> {job.url}")
+                            all_matched_jobs.extend(matched_jobs)
                 except Exception as e:
                     print(f"[ERROR] Thread execution failed for '{company_name}': {e}", file=sys.stderr)
+                    failed_boards.append((company_name, str(e)))
 
         print(f"\nScan completed. Found {len(all_matched_jobs)} matching job(s) in total.")
 
-        new_jobs = []
         sheets_active = False
 
         if all_matched_jobs:
@@ -256,17 +319,27 @@ def main():
         sys.stderr = original_stderr
         log_file.close()
 
-        # Send execution log file to Telegram
+        # Send execution summary to Telegram
         if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-            print("\nDispatching execution log to Telegram...")
+            print("\nDispatching run summary to Telegram...")
             try:
+                duration_seconds = (datetime.now() - start_time).total_seconds()
                 telegram_router = TelegramRouter(
                     bot_token=TELEGRAM_BOT_TOKEN,
                     chat_id=TELEGRAM_CHAT_ID
                 )
-                telegram_router.send_document(log_filename, caption="📋 Job Scraper Run Log")
+                summary_msg = telegram_router.format_run_summary(
+                    duration_seconds=duration_seconds,
+                    total_configured=len(COMPANY_BOARDS),
+                    scanned_count=len(scanned_boards),
+                    skipped_count=len(skipped_boards),
+                    failed_boards=failed_boards,
+                    total_found=len(all_matched_jobs),
+                    total_new=len(new_jobs)
+                )
+                telegram_router.send_message(summary_msg)
             except Exception as tg_err:
-                print(f"[ERROR] Failed to send run log to Telegram: {tg_err}")
+                print(f"[ERROR] Failed to send run summary to Telegram: {tg_err}")
 
 if __name__ == "__main__":
     main()

@@ -104,3 +104,47 @@ class TelegramRouter:
             print(f"[Telegram Router] Failed to send document: {e}")
             return False
 
+    def format_run_summary(
+        self,
+        duration_seconds: float,
+        total_configured: int,
+        scanned_count: int,
+        skipped_count: int,
+        failed_boards: List[tuple],
+        total_found: int,
+        total_new: int
+    ) -> str:
+        """Format a run execution summary for Telegram."""
+        # Format duration
+        if duration_seconds < 60:
+            duration_str = f"{int(duration_seconds)}s"
+        else:
+            minutes = int(duration_seconds // 60)
+            seconds = int(duration_seconds % 60)
+            duration_str = f"{minutes}m {seconds}s"
+
+        lines = [
+            "📋 *Job Scraper Run Summary*",
+            f"⏱️ *Duration*: {duration_str}",
+            f"🔍 *Total Boards*: {total_configured}",
+            f"   • *Scanned*: {scanned_count}",
+            f"   • *Skipped*: {skipped_count}",
+            f"   • *Failed*: {len(failed_boards)}",
+            f"💼 *Jobs Matched*: {total_found}",
+            f"🆕 *New Jobs Added*: {total_new}"
+        ]
+
+        if failed_boards:
+            lines.append("\n❌ *Failed Boards:*")
+            for company_name, err in failed_boards:
+                esc_company = self.escape_markdown(company_name)
+                # Keep error message brief to avoid overflowing telegram message
+                err_str = str(err)
+                if len(err_str) > 60:
+                    err_str = err_str[:57] + "..."
+                esc_err = self.escape_markdown(err_str)
+                lines.append(f"• *{esc_company}*: {esc_err}")
+
+        return "\n".join(lines)
+
+
