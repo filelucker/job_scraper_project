@@ -242,6 +242,8 @@ COMPANY_BOARDS = {
     'Y Combinator': {'ats': 'ycombinator', 'token': '*'},
     'Adzuna': {'ats': 'adzuna', 'token': '*'},
     'Jooble': {'ats': 'jooble', 'token': '*'},
+    'Otta': {'ats': 'welcometothejungle', 'token': '*'},
+    'FlexJobs': {'ats': 'flexjobs', 'token': '*'},
 }
 
 # ==========================================

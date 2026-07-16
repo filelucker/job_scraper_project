@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone, timedelta
-from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler
+from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler
 from handlers.base import BaseHandler
 
 class DummyHandler(BaseHandler):
@@ -358,6 +358,40 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(job.title, "Flutter Engineer")
         self.assertEqual(job.location, "Remote")
         self.assertEqual(job.url, "https://example.com/job")
+
+    def test_flexjobs_handler_parsing(self):
+        handler = FlexjobsHandler("FlexJobs", "*", ["Flutter", "Flutter Developer"])
+        
+        # Test keyword optimization (minimal keywords)
+        min_kws = handler._get_minimal_keywords()
+        self.assertEqual(min_kws, ["Flutter"]) # "Flutter Developer" is redundant
+        
+        # Test date parsing
+        now = datetime.now(timezone.utc)
+        self.assertAlmostEqual(handler._parse_date("Today").day, now.day)
+        self.assertAlmostEqual(handler._parse_date("Yesterday").day, (now - timedelta(days=1)).day)
+        self.assertAlmostEqual(handler._parse_date("2 days ago").day, (now - timedelta(days=2)).day)
+        
+        # Absolute date format parsing
+        parsed_abs = handler._parse_date("July 15, 2026")
+        self.assertEqual(parsed_abs.year, 2026)
+        self.assertEqual(parsed_abs.month, 7)
+        self.assertEqual(parsed_abs.day, 15)
+        
+        # Test job parsing
+        raw_job = {
+            "title": "Senior Flutter Developer — TechCorp",
+            "url": "https://www.flexjobs.com/publicjobs/techcorp-1",
+            "posted_str": "July 15, 2026",
+            "location_and_type": "Full-Time, Remote (USA)"
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "TechCorp")
+        self.assertEqual(job.title, "Senior Flutter Developer")
+        self.assertEqual(job.location, "Full-Time, Remote (USA)")
+        self.assertEqual(job.url, "https://www.flexjobs.com/publicjobs/techcorp-1")
+        self.assertEqual(job.posted_time.day, 15)
 
 if __name__ == "__main__":
     unittest.main()

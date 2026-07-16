@@ -9,9 +9,10 @@ from handlers.smartrecruiters import SmartRecruitersHandler
 from handlers.jobhive_adapter import JobhiveAdapterHandler
 from handlers.adzuna import AdzunaHandler
 from handlers.jooble import JoobleHandler
+from handlers.flexjobs import FlexjobsHandler
 
 __all__ = [
     "BaseHandler", "Job", "GreenhouseHandler", "LeverHandler", "FallbackHandler",
     "AshbyHandler", "WorkdayHandler", "WorkableHandler", "SmartRecruitersHandler",
-    "JobhiveAdapterHandler", "AdzunaHandler", "JoobleHandler"
+    "JobhiveAdapterHandler", "AdzunaHandler", "JoobleHandler", "FlexjobsHandler"
 ]

@@ -20,7 +20,7 @@ from config import (
 from handlers import (
     GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler,
     WorkdayHandler, WorkableHandler, SmartRecruitersHandler, JobhiveAdapterHandler,
-    AdzunaHandler, JoobleHandler
+    AdzunaHandler, JoobleHandler, FlexjobsHandler
 )
 from routers import TelegramRouter, GoogleSheetsRouter
 
@@ -153,6 +153,8 @@ def fetch_board(company_name: str, board_config: dict):
         handler = AdzunaHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, app_id=ADZUNA_APP_ID, app_key=ADZUNA_APP_KEY)
     elif ats_type == "jooble":
         handler = JoobleHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, api_key=JOOBLE_API_KEY)
+    elif ats_type == "flexjobs":
+        handler = FlexjobsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     elif JOBHIVE_AVAILABLE and ats_type in JOBHIVE_ATS_TYPES:
         handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     else:
