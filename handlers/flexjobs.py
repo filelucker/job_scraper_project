@@ -70,6 +70,7 @@ class FlexjobsHandler(BaseHandler):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         
+        consecutive_failures = 0
         for kw in minimal_kws:
             # Respect rate limits and avoid aggressive requests
             time.sleep(3.0)
@@ -81,7 +82,7 @@ class FlexjobsHandler(BaseHandler):
             backoff = 2.0
             for attempt in range(retries):
                 try:
-                    response = requests.get(url, headers=headers, timeout=30)
+                    response = requests.get(url, headers=headers, timeout=10)
                     break
                 except Exception as e:
                     if attempt == retries - 1:
@@ -94,7 +95,17 @@ class FlexjobsHandler(BaseHandler):
             if response is None or response.status_code != 200:
                 if response:
                     print(f"[FlexJobs] Warning: Failed to fetch search results for '{kw}' (HTTP {response.status_code})")
+                    if response.status_code in (403, 429):
+                        print(f"[FlexJobs] Critical: Request blocked with HTTP {response.status_code}. Aborting search to prevent further delays.")
+                        break
+                else:
+                    consecutive_failures += 1
+                    if consecutive_failures >= 2:
+                        print("[FlexJobs] Critical: Multiple consecutive connection failures. Aborting search to prevent further delays.")
+                        break
                 continue
+            
+            consecutive_failures = 0
                 
             try:
                 soup = BeautifulSoup(response.text, "html.parser")

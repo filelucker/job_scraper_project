@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone, timedelta
-from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler
+from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler
 from handlers.base import BaseHandler
 
 class DummyHandler(BaseHandler):
@@ -391,6 +391,47 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(job.title, "Senior Flutter Developer")
         self.assertEqual(job.location, "Full-Time, Remote (USA)")
         self.assertEqual(job.url, "https://www.flexjobs.com/publicjobs/techcorp-1")
+        self.assertEqual(job.posted_time.day, 15)
+
+    def test_linkedin_handler_parsing(self):
+        handler = LinkedInHandler("LinkedIn", "*", ["Flutter"], apify_api_token="test_token")
+        raw_job = {
+            "title": "Senior Flutter Developer",
+            "companyName": "TechCorp",
+            "link": "https://www.linkedin.com/jobs/view/12345",
+            "location": "Remote, US",
+            "postedAt": "2026-07-15T08:00:00Z"
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "TechCorp")
+        self.assertEqual(job.title, "Senior Flutter Developer")
+        self.assertEqual(job.location, "Remote, US")
+        self.assertEqual(job.url, "https://www.linkedin.com/jobs/view/12345")
+        self.assertEqual(job.posted_time.day, 15)
+
+    def test_indeed_handler_parsing(self):
+        handler = IndeedHandler("Indeed", "*", ["Flutter"], apify_api_token="test_token")
+        
+        # Relative date parsing tests
+        now = datetime.now(timezone.utc)
+        self.assertAlmostEqual(handler._parse_indeed_date("Just posted").day, now.day)
+        self.assertAlmostEqual(handler._parse_indeed_date("3 days ago").day, (now - timedelta(days=3)).day)
+
+        # Job parsing test
+        raw_job = {
+            "positionName": "Flutter Engineer",
+            "company": "AppStudio",
+            "url": "https://www.indeed.com/viewjob?jk=54321",
+            "location": "New York, NY",
+            "postedAt": "2026-07-15T08:00:00Z"
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "AppStudio")
+        self.assertEqual(job.title, "Flutter Engineer")
+        self.assertEqual(job.location, "New York, NY")
+        self.assertEqual(job.url, "https://www.indeed.com/viewjob?jk=54321")
         self.assertEqual(job.posted_time.day, 15)
 
 if __name__ == "__main__":

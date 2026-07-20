@@ -15,12 +15,18 @@ from config import (
     GOOGLE_WORKSHEET_NAME,
     ADZUNA_APP_ID,
     ADZUNA_APP_KEY,
-    JOOBLE_API_KEY
+    JOOBLE_API_KEY,
+    APIFY_API_TOKEN,
+    APIFY_LINKEDIN_ACTOR,
+    APIFY_INDEED_ACTOR,
+    APIFY_LINKEDIN_LOCATION,
+    APIFY_INDEED_LOCATION,
+    APIFY_INDEED_COUNTRY
 )
 from handlers import (
     GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler,
     WorkdayHandler, WorkableHandler, SmartRecruitersHandler, JobhiveAdapterHandler,
-    AdzunaHandler, JoobleHandler, FlexjobsHandler
+    AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler
 )
 from routers import TelegramRouter, GoogleSheetsRouter
 
@@ -129,6 +135,14 @@ def fetch_board(company_name: str, board_config: dict):
         print(f"[Jooble - {company_name}] Info: JOOBLE_API_KEY is not set. Skipping board.", file=sys.stderr)
         return company_name, [], "skipped", None
 
+    if ats_type == "linkedin" and (not APIFY_API_TOKEN or APIFY_API_TOKEN.startswith("your_apify_")):
+        print(f"[LinkedIn - {company_name}] Info: APIFY_API_TOKEN is not set or is placeholder. Skipping board.", file=sys.stderr)
+        return company_name, [], "skipped", None
+
+    if ats_type == "indeed" and (not APIFY_API_TOKEN or APIFY_API_TOKEN.startswith("your_apify_")):
+        print(f"[Indeed - {company_name}] Info: APIFY_API_TOKEN is not set or is placeholder. Skipping board.", file=sys.stderr)
+        return company_name, [], "skipped", None
+
     # Skip extremely heavy national public-sector aggregators by default to prevent long runs or hangs
     if ats_type in ("arbetsformedlingen", "bundesagentur", "eures") and not os.getenv("ENABLE_NATIONAL_AGGREGATORS"):
         print(f"[{company_name}] Info: National aggregator is disabled by default to prevent long execution times. Set ENABLE_NATIONAL_AGGREGATORS=1 to enable.", file=sys.stderr)
@@ -155,6 +169,29 @@ def fetch_board(company_name: str, board_config: dict):
         handler = JoobleHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, api_key=JOOBLE_API_KEY)
     elif ats_type == "flexjobs":
         handler = FlexjobsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+    elif ats_type == "linkedin":
+        handler = LinkedInHandler(
+            company_name,
+            token,
+            KEYWORDS,
+            JOB_LOOKBACK_HOURS,
+            only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID,
+            apify_api_token=APIFY_API_TOKEN,
+            actor_name=APIFY_LINKEDIN_ACTOR,
+            location=APIFY_LINKEDIN_LOCATION
+        )
+    elif ats_type == "indeed":
+        handler = IndeedHandler(
+            company_name,
+            token,
+            KEYWORDS,
+            JOB_LOOKBACK_HOURS,
+            only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID,
+            apify_api_token=APIFY_API_TOKEN,
+            actor_name=APIFY_INDEED_ACTOR,
+            location=APIFY_INDEED_LOCATION,
+            country=APIFY_INDEED_COUNTRY
+        )
     elif JOBHIVE_AVAILABLE and ats_type in JOBHIVE_ATS_TYPES:
         handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
     else:

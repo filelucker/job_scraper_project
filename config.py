@@ -40,12 +40,12 @@ KEYWORDS = [
     "Backend Developer",
     "Backend Engineer",
 
-    # React
-    "React Developer",
-    "React Engineer",
-    "React.js",
-    "ReactJS",
-    "Next.js"
+    # # React
+    # "React Developer",
+    # "React Engineer",
+    # "React.js",
+    # "ReactJS",
+    # "Next.js"
 ]
 
 # Time limit in hours for jobs posted
@@ -211,13 +211,13 @@ COMPANY_BOARDS = {
     'whatsapp': {'ats': 'workable', 'token': 'whatsapp'},
 
     # --- Added Direct Boards ---
-    'Vanta': {'ats': 'lever', 'token': 'vanta'},
-    'Retool': {'ats': 'greenhouse', 'token': 'retool'},
+    'Vanta': {'ats': 'ashby', 'token': 'vanta'},
+    'Retool': {'ats': 'gem', 'token': 'retool'},
     'Plaid': {'ats': 'greenhouse', 'token': 'plaid'},
     'Verkada': {'ats': 'greenhouse', 'token': 'verkada'},
     'Scale AI': {'ats': 'greenhouse', 'token': 'scaleai'},
     'Harness': {'ats': 'greenhouse', 'token': 'harness'},
-    'Postman': {'ats': 'lever', 'token': 'postman'},
+    'Postman': {'ats': 'greenhouse', 'token': 'postman'},
     'Faire': {'ats': 'greenhouse', 'token': 'faire'},
     'Checkr': {'ats': 'greenhouse', 'token': 'checkr'},
     'Remote': {'ats': 'greenhouse', 'token': 'remote'},
@@ -244,6 +244,8 @@ COMPANY_BOARDS = {
     'Jooble': {'ats': 'jooble', 'token': '*'},
     'Otta': {'ats': 'welcometothejungle', 'token': '*'},
     'FlexJobs': {'ats': 'flexjobs', 'token': '*'},
+    'LinkedIn': {'ats': 'linkedin', 'token': '*'},
+    'Indeed': {'ats': 'indeed', 'token': '*'},
 }
 
 # ==========================================
@@ -265,3 +267,11 @@ ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY")
 
 # Jooble API configuration
 JOOBLE_API_KEY = os.getenv("JOOBLE_API_KEY")
+
+# Apify API configuration
+APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN")
+APIFY_LINKEDIN_ACTOR = os.getenv("APIFY_LINKEDIN_ACTOR", "curious_coder/linkedin-jobs-scraper")
+APIFY_INDEED_ACTOR = os.getenv("APIFY_INDEED_ACTOR", "misceres/indeed-scraper")
+APIFY_LINKEDIN_LOCATION = os.getenv("APIFY_LINKEDIN_LOCATION", "Remote")
+APIFY_INDEED_LOCATION = os.getenv("APIFY_INDEED_LOCATION", "Remote")
+APIFY_INDEED_COUNTRY = os.getenv("APIFY_INDEED_COUNTRY", "US")
