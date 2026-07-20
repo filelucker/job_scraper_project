@@ -125,7 +125,6 @@ Scanning boards concurrently with up to 10 threads...
 [FlexJobs] Fetching results for keyword 'Full Stack Developer'...
 [FlexJobs] Request failed or timed out. Retrying in 2.0s... (HTTPSConnectionPool(host='www.flexjobs.com', port=443): Read timed out. (read timeout=15))
 [FlexJobs] Request failed or timed out. Retrying in 4.0s... (HTTPSConnectionPool(host='www.flexjobs.com', port=443): Read timed out. (read timeout=15))
-Pool(host='www.flexjobs.com', port=443): Read timed out. (read timeout=15))
 [FlexJobs] Error: Failed to fetch search results for 'Full Stack Developer' after 3 attempts: HTTPSConnectionPool(host='www.flexjobs.com', port=443): Read timed out. (read timeout=15)
 [FlexJobs] Fetching results for keyword 'AI Integration Engineer'...
 [FlexJobs] Request failed or timed out. Retrying in 2.0s... (HTTPSConnectionPool(host='www.flexjobs.com', port=443): Read timed out. (read timeout=15))
@@ -143,6 +142,9 @@ Found 52 job URLs already in Google Sheets.
 Filtered out 32 duplicate(s). 0 new job(s) to process.
 
 Dispatching alerts to Telegram...
+Telegram notification dispatched successfully.
+
+=== Pipeline finished ===
 Telegram notification dispatched successfully.
 
 === Pipeline finished ===
