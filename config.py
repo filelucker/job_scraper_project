@@ -54,6 +54,47 @@ JOB_LOOKBACK_HOURS = 24
 # Location filtering: If True, only jobs matching 'remote' or 'hybrid' in location/title are processed
 ONLY_REMOTE_OR_HYBRID = True
 
+# Truly global search locations and domains
+LINKEDIN_GLOBAL_LOCATIONS = ["Worldwide"]
+
+# Curated list of top tech-hiring countries for fast and cost-efficient searches
+INDEED_CURATED_DOMAINS = [
+    "www.indeed.com",      # United States
+    "uk.indeed.com",       # United Kingdom
+    "ca.indeed.com",       # Canada
+    "au.indeed.com",       # Australia
+    "de.indeed.com",       # Germany
+    "fr.indeed.com",       # France
+    "in.indeed.com",       # India
+    "sg.indeed.com",       # Singapore
+    "kr.indeed.com",       # South Korea
+    "jp.indeed.com",       # Japan
+    "nl.indeed.com",       # Netherlands
+    "se.indeed.com",       # Sweden
+    "ie.indeed.com",       # Ireland
+    "ae.indeed.com",       # United Arab Emirates
+    "ch.indeed.com"        # Switzerland
+]
+
+# Comprehensive list of all 58 country domains supported by Indeed
+INDEED_ALL_DOMAINS = [
+    "www.indeed.com", "uk.indeed.com", "ca.indeed.com", "au.indeed.com", "de.indeed.com",
+    "fr.indeed.com", "in.indeed.com", "sg.indeed.com", "kr.indeed.com", "jp.indeed.com",
+    "nl.indeed.com", "se.indeed.com", "ie.indeed.com", "ae.indeed.com", "ch.indeed.com",
+    "ar.indeed.com", "at.indeed.com", "be.indeed.com", "br.indeed.com", "cl.indeed.com",
+    "co.indeed.com", "cr.indeed.com", "cz.indeed.com", "dk.indeed.com", "ec.indeed.com",
+    "eg.indeed.com", "fi.indeed.com", "gr.indeed.com", "hk.indeed.com", "hu.indeed.com",
+    "id.indeed.com", "il.indeed.com", "it.indeed.com", "lu.indeed.com", "my.indeed.com",
+    "mx.indeed.com", "ma.indeed.com", "nz.indeed.com", "no.indeed.com", "om.indeed.com",
+    "pk.indeed.com", "pa.indeed.com", "pe.indeed.com", "ph.indeed.com", "pl.indeed.com",
+    "pt.indeed.com", "qa.indeed.com", "ro.indeed.com", "sa.indeed.com", "za.indeed.com",
+    "es.indeed.com", "tw.indeed.com", "th.indeed.com", "tr.indeed.com", "ua.indeed.com",
+    "uy.indeed.com", "ve.indeed.com", "vn.indeed.com"
+]
+
+# Set the active Indeed domains list. Switch to INDEED_ALL_DOMAINS if you want full global coverage.
+INDEED_GLOBAL_DOMAINS = INDEED_CURATED_DOMAINS
+
 
 # ==========================================
 # 2. Portal Mappings

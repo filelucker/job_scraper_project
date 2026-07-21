@@ -8,6 +8,8 @@ from config import (
     JOB_LOOKBACK_HOURS,
     ONLY_REMOTE_OR_HYBRID,
     COMPANY_BOARDS,
+    LINKEDIN_GLOBAL_LOCATIONS,
+    INDEED_GLOBAL_DOMAINS,
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
     GOOGLE_CREDENTIALS_JSON,
@@ -178,7 +180,8 @@ def fetch_board(company_name: str, board_config: dict):
             only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID,
             apify_api_token=APIFY_API_TOKEN,
             actor_name=APIFY_LINKEDIN_ACTOR,
-            location=APIFY_LINKEDIN_LOCATION
+            location=APIFY_LINKEDIN_LOCATION,
+            countries=[{"linkedin_location": loc} for loc in LINKEDIN_GLOBAL_LOCATIONS]
         )
     elif ats_type == "indeed":
         handler = IndeedHandler(
@@ -190,7 +193,8 @@ def fetch_board(company_name: str, board_config: dict):
             apify_api_token=APIFY_API_TOKEN,
             actor_name=APIFY_INDEED_ACTOR,
             location=APIFY_INDEED_LOCATION,
-            country=APIFY_INDEED_COUNTRY
+            country=APIFY_INDEED_COUNTRY,
+            countries=[{"indeed_domain": dom} for dom in INDEED_GLOBAL_DOMAINS]
         )
     elif JOBHIVE_AVAILABLE and ats_type in JOBHIVE_ATS_TYPES:
         handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)

@@ -19,12 +19,14 @@ class LinkedInHandler(BaseHandler):
         only_remote_or_hybrid: bool = False,
         apify_api_token: str = "",
         actor_name: str = "curious_coder/linkedin-jobs-scraper",
-        location: str = "Remote"
+        location: str = "Remote",
+        countries: Optional[List[Dict[str, str]]] = None
     ):
         super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid)
         self.apify_api_token = apify_api_token
         self.actor_name = actor_name
         self.location = location
+        self.countries = countries or [{"name": "Default", "linkedin_location": location}]
 
     def fetch_raw_jobs(self) -> List[Dict[str, Any]]:
         if not self.apify_api_token:
@@ -40,7 +42,6 @@ class LinkedInHandler(BaseHandler):
         
         # Build URL-encoded search link for cookieless scrapers (like curious_coder)
         encoded_query = urllib.parse.quote(query)
-        encoded_location = urllib.parse.quote(self.location)
         
         # Determine Work Type parameter f_WT: 2 = Remote, 3 = Hybrid
         wt_param = ""
@@ -55,7 +56,13 @@ class LinkedInHandler(BaseHandler):
         else:
             tpr_param = "&f_TPR=r2592000"
 
-        search_url = f"https://www.linkedin.com/jobs/search/?keywords={encoded_query}&location={encoded_location}{wt_param}{tpr_param}&sortBy=DD"
+        # Generate target URLs for all configured locations
+        search_urls = []
+        for country_cfg in self.countries:
+            loc = country_cfg.get("linkedin_location") or self.location
+            encoded_location = urllib.parse.quote(loc)
+            search_url = f"https://www.linkedin.com/jobs/search/?keywords={encoded_query}&location={encoded_location}{wt_param}{tpr_param}&sortBy=DD"
+            search_urls.append(search_url)
 
         # Map lookback hours to datePosted filter (for actors that support it)
         if self.lookback_hours <= 24:
@@ -68,21 +75,21 @@ class LinkedInHandler(BaseHandler):
         # Determine payload structure depending on the actor
         if "curious_coder" in self.actor_name:
             payload = {
-                "urls": [search_url],
+                "urls": search_urls,
                 "maxJobs": 100
             }
         else:
             # Fallback format for bebity or other actors
             payload = {
                 "title": query,
-                "location": self.location,
+                "location": self.countries[0].get("linkedin_location") or self.location,
                 "datePosted": date_posted,
                 "proxy": {
                     "useApifyProxy": True
                 }
             }
 
-        print(f"[LinkedIn - Apify] Triggering actor {self.actor_name} with target URL: {search_url[:100]}...")
+        print(f"[LinkedIn - Apify] Triggering actor {self.actor_name} with {len(search_urls)} target URLs...")
         try:
             # We explicitly pass timeout to override the monkeypatched 30s session timeout
             response = requests.post(run_url, json=payload, timeout=60)

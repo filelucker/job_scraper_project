@@ -8,8 +8,33 @@ class Job:
         self.company = company
         self.title = title
         self.location = location
-        self.url = url
+        self.url = self.normalize_url(url)
         self.posted_time = posted_time  # Must be timezone-aware datetime
+
+    def normalize_url(self, url: str) -> str:
+        """Strip tracking parameters and localized subdomains to ensure robust deduplication."""
+        if not url:
+            return ""
+        
+        import urllib.parse
+        parsed = urllib.parse.urlparse(url.strip())
+        
+        if "linkedin.com" in parsed.netloc and "/jobs/view/" in parsed.path:
+            # Extract the ID from the path (e.g. /jobs/view/title-12345 or /jobs/view/12345)
+            match = re.search(r'(\d+)/?$', parsed.path)
+            if match:
+                job_id = match.group(1)
+                return f"https://www.linkedin.com/jobs/view/{job_id}"
+                
+        elif "indeed.com" in parsed.netloc:
+            # Preserve only the 'jk' parameter as that identifies the job ID uniquely
+            query_params = urllib.parse.parse_qs(parsed.query)
+            jk_val = query_params.get("jk")
+            if jk_val:
+                return f"https://www.indeed.com/viewjob?jk={jk_val[0]}"
+                
+        # Fallback: remove query parameters for other websites
+        return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, parsed.path, '', '', ''))
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert job representation to a dictionary for routers."""

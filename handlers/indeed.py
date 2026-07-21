@@ -20,13 +20,15 @@ class IndeedHandler(BaseHandler):
         apify_api_token: str = "",
         actor_name: str = "misceres/indeed-scraper",
         location: str = "Remote",
-        country: str = "us"
+        country: str = "us",
+        countries: Optional[List[Dict[str, str]]] = None
     ):
         super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid)
         self.apify_api_token = apify_api_token
         self.actor_name = actor_name
         self.location = location
         self.country = country.upper()
+        self.countries = countries or [{"name": "Default", "indeed_domain": f"www.indeed.com" if country.lower() == "us" else f"{country.lower()}.indeed.com"}]
 
     def fetch_raw_jobs(self) -> List[Dict[str, Any]]:
         if not self.apify_api_token:
@@ -40,14 +42,35 @@ class IndeedHandler(BaseHandler):
         # Combine keywords using OR
         query = " OR ".join([f'"{kw}"' for kw in self.keywords])
 
+        # Generate target startUrls for all configured locations
+        import urllib.parse
+        start_urls = []
+        for country_cfg in self.countries:
+            domain = country_cfg.get("indeed_domain") or "www.indeed.com"
+            # fromage: 1 for 24h, 3 for 3 days, 7 for 7 days
+            fromage = 1
+            if self.lookback_hours <= 24:
+                fromage = 1
+            elif self.lookback_hours <= 72:
+                fromage = 3
+            elif self.lookback_hours <= 168:
+                fromage = 7
+            else:
+                fromage = 14
+            
+            # Encode query and location
+            encoded_query = urllib.parse.quote(query)
+            encoded_location = urllib.parse.quote(self.location)
+            
+            url = f"https://{domain}/jobs?q={encoded_query}&l={encoded_location}&fromage={fromage}&sort=date"
+            start_urls.append({"url": url})
+
         payload = {
-            "position": query,
-            "location": self.location,
-            "country": self.country,
+            "startUrls": start_urls,
             "maxItemsPerSearch": 100
         }
 
-        print(f"[Indeed - Apify] Triggering actor {self.actor_name} for query: {query[:100]}...")
+        print(f"[Indeed - Apify] Triggering actor {self.actor_name} with {len(start_urls)} target startUrls...")
         try:
             # We explicitly pass timeout to override the monkeypatched 30s session timeout
             response = requests.post(run_url, json=payload, timeout=60)

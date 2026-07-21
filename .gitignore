@@ -22,3 +22,7 @@ secrets/
 *.json
 !requirements.txt
 !package.json
+
+# Local log files and state caches
+pipeline.log
+scraped_jobs.json
