@@ -37,8 +37,12 @@ try:
     import anyio
     import httpcore
     import httpx
-    from jobhive.models import ATSType
-    from jobhive.scrapers.base import get_scraper
+    try:
+        from ats_scrapers.models import ATSType
+        from ats_scrapers.scrapers.base import get_scraper
+    except ImportError:
+        from jobhive.models import ATSType
+        from jobhive.scrapers.base import get_scraper
     JOBHIVE_AVAILABLE = True
     JOBHIVE_ATS_TYPES = {t.value for t in ATSType}
 except ImportError:

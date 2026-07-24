@@ -2,8 +2,12 @@ import os
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from handlers.base import BaseHandler, Job
-from jobhive.scrapers.base import get_scraper
-from jobhive.models import ATSType
+try:
+    from ats_scrapers.scrapers.base import get_scraper
+    from ats_scrapers.models import ATSType
+except ImportError:
+    from jobhive.scrapers.base import get_scraper
+    from jobhive.models import ATSType
 
 class JobhiveAdapterHandler(BaseHandler):
     """Handler that wraps jobhive-py scrapers to support Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Workday, etc."""
