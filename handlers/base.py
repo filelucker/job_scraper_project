@@ -94,15 +94,17 @@ class BaseHandler:
         return False
     def matches_location(self, location: str, title: str) -> bool:
         """
-        Check if the job matches the location filters (Remote / Hybrid) if enabled.
+        Check if the job matches location filters (Remote / Hybrid / EU / Europe / UAE / Dubai) if enabled.
         """
         if not self.only_remote_or_hybrid:
             return True
         
         loc_lower = (location or "").lower()
         title_lower = (title or "").lower()
+        text = f"{loc_lower} {title_lower}"
         
-        return "remote" in loc_lower or "hybrid" in loc_lower or "remote" in title_lower or "hybrid" in title_lower
+        target_keywords = ["remote", "hybrid", "eu", "europe", "european union", "uae", "united arab emirates", "dubai", "abu dhabi"]
+        return any(kw in text for kw in target_keywords)
 
     def is_within_lookback(self, posted_time: datetime) -> bool:
         """Verify if the job posting was created/updated within the lookback window."""

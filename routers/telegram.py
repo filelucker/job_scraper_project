@@ -48,7 +48,7 @@ class TelegramRouter:
         return "\n".join(lines)
 
     def send_message(self, message: str) -> bool:
-        """Send formatted message to Telegram API with character limit splitting."""
+        """Send formatted message to Telegram API with intelligent line-boundary splitting."""
         if not self.bot_token or not self.chat_id:
             print("[Telegram Router] Missing bot token or chat ID. Skipping notification.")
             return False
@@ -56,9 +56,26 @@ class TelegramRouter:
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
         
         # Telegram max length for sendMessage is 4096 characters.
-        # Split message if it exceeds the limit.
-        max_length = 4000
-        message_chunks = [message[i:i + max_length] for i in range(0, len(message), max_length)]
+        # Split message gracefully along line breaks to preserve Markdown formatting tags.
+        max_length = 3800
+        message_chunks = []
+        
+        if len(message) <= max_length:
+            message_chunks.append(message)
+        else:
+            current_chunk = []
+            current_length = 0
+            for line in message.split("\n"):
+                line_len = len(line) + 1
+                if current_length + line_len > max_length and current_chunk:
+                    message_chunks.append("\n".join(current_chunk))
+                    current_chunk = [line]
+                    current_length = line_len
+                else:
+                    current_chunk.append(line)
+                    current_length += line_len
+            if current_chunk:
+                message_chunks.append("\n".join(current_chunk))
         
         success = True
         for chunk in message_chunks:
@@ -72,14 +89,17 @@ class TelegramRouter:
                 response = requests.post(url, json=payload, timeout=15)
                 response.raise_for_status()
             except requests.RequestException as e:
-                print(f"[Telegram Router] Failed to send message: {e}")
                 # Try fallback as plain text if markdown formatting caused an error
                 try:
-                    payload["parse_mode"] = ""  # Plain text
-                    response = requests.post(url, json=payload, timeout=15)
+                    payload_plain = {
+                        "chat_id": self.chat_id,
+                        "text": chunk,
+                        "disable_web_page_preview": True
+                    }
+                    response = requests.post(url, json=payload_plain, timeout=15)
                     response.raise_for_status()
                 except requests.RequestException as e_inner:
-                    print(f"[Telegram Router] Fallback sending failed: {e_inner}")
+                    print(f"[Telegram Router] Sending failed: {e_inner}")
                     success = False
         return success
 
