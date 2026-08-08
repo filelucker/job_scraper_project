@@ -14,7 +14,7 @@ KEYWORDS = [
     "Android",
     "iOS",
     "Dart",
-    "Java",
+    # "Java",
     "Kotlin",
     "Flutter/Android/iOS/Dart",
     "Flutter Developer",
