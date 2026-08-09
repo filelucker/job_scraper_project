@@ -695,6 +695,23 @@ COMPANY_BOARDS = {
     'PocketFM': {'ats': 'ashby', 'token': 'pocketfm'},
     'Kuku FM': {'ats': 'ashby', 'token': 'kukufm'},
 
+    # --- Top Flutter & Mobile App Agencies (2026) ---
+    'ArcTouch': {'ats': 'greenhouse', 'token': 'arctouch'},
+    'Droids On Roids': {'ats': 'greenhouse', 'token': 'droidsonroids'},
+    'Cheesecake Labs': {'ats': 'greenhouse', 'token': 'cheesecakelabs'},
+    'LeanCode': {'ats': 'workable', 'token': 'leancode'},
+    'SolveIt': {'ats': 'workable', 'token': 'solveit'},
+    'Surf': {'ats': 'workable', 'token': 'surf'},
+    'TechAhead': {'ats': 'greenhouse', 'token': 'techahead'},
+    'Aubergine Solutions': {'ats': 'workable', 'token': 'auberginesolutions'},
+    'Somnio Software': {'ats': 'lever', 'token': 'somnio-software'},
+    'Innowise': {'ats': 'smartrecruiters', 'token': 'InnowiseGroup'},
+    'GeekyAnts': {'ats': 'lever', 'token': 'geekyants'},
+    'itCraft': {'ats': 'workable', 'token': 'itcraft'},
+    'hedgehog lab': {'ats': 'greenhouse', 'token': 'hedgehoglab'},
+    'iTechnolabs': {'ats': 'workable', 'token': 'itechnolabs'},
+    'Calgary App Developer': {'ats': 'workable', 'token': 'calgaryappdeveloper'},
+
 
     # --- Additional High-Growth Tech Companies & Scaleups ---
     'Speakeasy API SDKs': {'ats': 'ashby', 'token': 'speakeasy'},
