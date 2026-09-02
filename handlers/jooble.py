@@ -8,8 +8,8 @@ class JoobleHandler(BaseHandler):
     Handler for Jooble Job Search API.
     Utilizes free Jooble API key.
     """
-    def __init__(self, company_name: str, token: str, keywords: List[str], lookback_hours: int = 24, only_remote_or_hybrid: bool = False, api_key: str = ""):
-        super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid)
+    def __init__(self, company_name: str, token: str, keywords: List[str], lookback_hours: int = 24, only_remote_or_hybrid: bool = False, api_key: str = "", compound_rules: Optional[List[Dict[str, Any]]] = None):
+        super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid, compound_rules=compound_rules)
         self.api_key = api_key
 
     def fetch_raw_jobs(self) -> List[Dict[str, Any]]:

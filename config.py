@@ -21,6 +21,9 @@ KEYWORDS = [
     "Flutter Engineer",
     "Android Developer",
     "Android Engineer",
+    "Senior Android Developer",
+    "Senior App Developer",
+    "App Developer",
     "Mobile Developer",
     "Mobile Engineer",
 
@@ -48,6 +51,46 @@ KEYWORDS = [
     # "React.js",
     # "ReactJS",
     # "Next.js"
+]
+
+# Compound rules for advanced multi-field boolean matching:
+# Matches if title matches title_keywords AND description/tags match context_keywords
+# (or if native visa sponsorship / relocation flags are present).
+COMPOUND_RULES = [
+    {
+        # "Senior Android Developer" AND "visa sponsorship"
+        "title_keywords": [
+            "Senior Android Developer",
+            "Android Developer",
+            "Senior Android Engineer",
+            "Lead Android Developer",
+            "Principal Android Developer"
+        ],
+        "context_keywords": ["visa sponsorship", "visa", "sponsorship"]
+    },
+    {
+        # "Senior App Developer" AND "relocation provided"
+        "title_keywords": [
+            "Senior App Developer",
+            "App Developer",
+            "Senior Mobile Developer",
+            "Mobile Developer",
+            "Senior Mobile Engineer"
+        ],
+        "context_keywords": ["relocation provided", "relocation package", "relocation assistance", "relocation"]
+    },
+    {
+        # "App Developer" AND "English speaking"
+        "title_keywords": [
+            "App Developer",
+            "Mobile Developer",
+            "Android Developer",
+            "iOS Developer",
+            "Flutter Developer",
+            "Mobile Engineer"
+        ],
+        "context_keywords": ["english speaking", "english-speaking", "english"]
+    }
 ]
 
 # Time limit in hours for jobs posted
@@ -1240,6 +1283,10 @@ COMPANY_BOARDS = {
     'FlexJobs': {'ats': 'flexjobs', 'token': '*'},
     'LinkedIn': {'ats': 'linkedin', 'token': '*'},
     'Indeed': {'ats': 'indeed', 'token': '*'},
+    'Arbeitnow': {'ats': 'arbeitnow', 'token': '*'},
+    'WeAreDevelopers': {'ats': 'wearedevelopers', 'token': '*'},
+    'GermanTechJobs': {'ats': 'germantechjobs', 'token': '*'},
+    'Relocate.me': {'ats': 'relocateme', 'token': '*'},
 }
 
 # ==========================================
@@ -1261,6 +1308,14 @@ ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY")
 
 # Jooble API configuration
 JOOBLE_API_KEY = os.getenv("JOOBLE_API_KEY")
+
+# GermanTechJobs / JobCopilot account configuration
+GERMANTECHJOBS_COOKIE = os.getenv("GERMANTECHJOBS_COOKIE")
+JOBCOPILOT_TOKEN = os.getenv("JOBCOPILOT_TOKEN")
+
+# Relocate.me / The Global Move account configuration
+RELOCATEME_COOKIE = os.getenv("RELOCATEME_COOKIE")
+RELOCATEME_FEED_URL = os.getenv("RELOCATEME_FEED_URL")
 
 # Apify API configuration
 APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN")

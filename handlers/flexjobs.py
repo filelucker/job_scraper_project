@@ -12,8 +12,8 @@ class FlexjobsHandler(BaseHandler):
     Since FlexJobs doesn't offer a public API or RSS feed, we construct search pages
     for target keywords, fetch them, and parse the jobs from the HTML results.
     """
-    def __init__(self, company_name: str, token: str, keywords: List[str], lookback_hours: int = 24, only_remote_or_hybrid: bool = False):
-        super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid)
+    def __init__(self, company_name: str, token: str, keywords: List[str], lookback_hours: int = 24, only_remote_or_hybrid: bool = False, compound_rules: Optional[List[Dict[str, Any]]] = None):
+        super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid, compound_rules=compound_rules)
         
     def _get_minimal_keywords(self) -> List[str]:
         """

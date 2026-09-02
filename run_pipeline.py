@@ -5,6 +5,7 @@ import concurrent.futures
 from datetime import datetime, timezone
 from config import (
     KEYWORDS,
+    COMPOUND_RULES,
     JOB_LOOKBACK_HOURS,
     ONLY_REMOTE_OR_HYBRID,
     COMPANY_BOARDS,
@@ -23,12 +24,17 @@ from config import (
     APIFY_INDEED_ACTOR,
     APIFY_LINKEDIN_LOCATION,
     APIFY_INDEED_LOCATION,
-    APIFY_INDEED_COUNTRY
+    APIFY_INDEED_COUNTRY,
+    GERMANTECHJOBS_COOKIE,
+    JOBCOPILOT_TOKEN,
+    RELOCATEME_COOKIE,
+    RELOCATEME_FEED_URL
 )
 from handlers import (
     GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler,
     WorkdayHandler, WorkableHandler, SmartRecruitersHandler, JobhiveAdapterHandler,
-    AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler
+    AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler,
+    ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler
 )
 from routers import TelegramRouter, GoogleSheetsRouter
 
@@ -149,6 +155,11 @@ def fetch_board(company_name: str, board_config: dict):
         print(f"[Indeed - {company_name}] Info: APIFY_API_TOKEN is not set or is placeholder. Skipping board.", file=sys.stderr)
         return company_name, [], "skipped", None
 
+    if ats_type == "germantechjobs" and not GERMANTECHJOBS_COOKIE and not JOBCOPILOT_TOKEN:
+        print(f"[GermanTechJobs - {company_name}] Info: GERMANTECHJOBS_COOKIE or JOBCOPILOT_TOKEN is not set. Skipping board.", file=sys.stderr)
+        return company_name, [], "skipped", None
+
+
     # Skip extremely heavy national public-sector aggregators by default to prevent long runs or hangs
     if ats_type in ("arbetsformedlingen", "bundesagentur", "eures") and not os.getenv("ENABLE_NATIONAL_AGGREGATORS"):
         print(f"[{company_name}] Info: National aggregator is disabled by default to prevent long execution times. Set ENABLE_NATIONAL_AGGREGATORS=1 to enable.", file=sys.stderr)
@@ -158,23 +169,31 @@ def fetch_board(company_name: str, board_config: dict):
     # We prefer optimized native handlers first for speed and timeout robustness.
     # We fall back to the Jobhive adapter handler if no native handler is available but Jobhive supports it.
     if ats_type == "greenhouse":
-        handler = GreenhouseHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+        handler = GreenhouseHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "lever":
-        handler = LeverHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+        handler = LeverHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "ashby":
-        handler = AshbyHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+        handler = AshbyHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "workday":
-        handler = WorkdayHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+        handler = WorkdayHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "workable":
-        handler = WorkableHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+        handler = WorkableHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "smartrecruiters":
-        handler = SmartRecruitersHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+        handler = SmartRecruitersHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "arbeitnow":
+        handler = ArbeitnowHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "wearedevelopers":
+        handler = WeAreDevelopersHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "germantechjobs":
+        handler = GermanTechJobsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, session_cookie=GERMANTECHJOBS_COOKIE, auth_token=JOBCOPILOT_TOKEN, compound_rules=COMPOUND_RULES)
+    elif ats_type == "relocateme":
+        handler = RelocateMeHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, session_cookie=RELOCATEME_COOKIE, feed_url=RELOCATEME_FEED_URL, compound_rules=COMPOUND_RULES)
     elif ats_type == "adzuna":
-        handler = AdzunaHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, app_id=ADZUNA_APP_ID, app_key=ADZUNA_APP_KEY)
+        handler = AdzunaHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, app_id=ADZUNA_APP_ID, app_key=ADZUNA_APP_KEY, compound_rules=COMPOUND_RULES)
     elif ats_type == "jooble":
-        handler = JoobleHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, api_key=JOOBLE_API_KEY)
+        handler = JoobleHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, api_key=JOOBLE_API_KEY, compound_rules=COMPOUND_RULES)
     elif ats_type == "flexjobs":
-        handler = FlexjobsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+        handler = FlexjobsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "linkedin":
         handler = LinkedInHandler(
             company_name,
@@ -185,7 +204,8 @@ def fetch_board(company_name: str, board_config: dict):
             apify_api_token=APIFY_API_TOKEN,
             actor_name=APIFY_LINKEDIN_ACTOR,
             location=APIFY_LINKEDIN_LOCATION,
-            countries=[{"linkedin_location": loc} for loc in LINKEDIN_GLOBAL_LOCATIONS]
+            countries=[{"linkedin_location": loc} for loc in LINKEDIN_GLOBAL_LOCATIONS],
+            compound_rules=COMPOUND_RULES
         )
     elif ats_type == "indeed":
         handler = IndeedHandler(
@@ -198,12 +218,13 @@ def fetch_board(company_name: str, board_config: dict):
             actor_name=APIFY_INDEED_ACTOR,
             location=APIFY_INDEED_LOCATION,
             country=APIFY_INDEED_COUNTRY,
-            countries=[{"indeed_domain": dom} for dom in INDEED_GLOBAL_DOMAINS]
+            countries=[{"indeed_domain": dom} for dom in INDEED_GLOBAL_DOMAINS],
+            compound_rules=COMPOUND_RULES
         )
     elif JOBHIVE_AVAILABLE and ats_type in JOBHIVE_ATS_TYPES:
-        handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+        handler = JobhiveAdapterHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, ats_type=ats_type, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     else:
-        handler = FallbackHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID)
+        handler = FallbackHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
 
     try:
         matched_jobs = handler.execute()

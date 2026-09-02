@@ -20,9 +20,10 @@ class LinkedInHandler(BaseHandler):
         apify_api_token: str = "",
         actor_name: str = "curious_coder/linkedin-jobs-scraper",
         location: str = "Remote",
-        countries: Optional[List[Dict[str, str]]] = None
+        countries: Optional[List[Dict[str, str]]] = None,
+        compound_rules: Optional[List[Dict[str, Any]]] = None
     ):
-        super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid)
+        super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid, compound_rules=compound_rules)
         self.apify_api_token = apify_api_token
         self.actor_name = actor_name
         self.location = location

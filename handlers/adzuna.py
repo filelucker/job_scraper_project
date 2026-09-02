@@ -8,8 +8,8 @@ class AdzunaHandler(BaseHandler):
     Handler for Adzuna Job Search API.
     Utilizes free developer app_id and app_key.
     """
-    def __init__(self, company_name: str, token: str, keywords: List[str], lookback_hours: int = 24, only_remote_or_hybrid: bool = False, app_id: str = "", app_key: str = ""):
-        super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid)
+    def __init__(self, company_name: str, token: str, keywords: List[str], lookback_hours: int = 24, only_remote_or_hybrid: bool = False, app_id: str = "", app_key: str = "", compound_rules: Optional[List[Dict[str, Any]]] = None):
+        super().__init__(company_name, token, keywords, lookback_hours, only_remote_or_hybrid, compound_rules=compound_rules)
         self.app_id = app_id
         self.app_key = app_key
 

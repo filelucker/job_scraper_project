@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone, timedelta
-from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler
+from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler, ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler
 from handlers.base import BaseHandler
 
 class DummyHandler(BaseHandler):
@@ -433,6 +433,100 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(job.location, "New York, NY")
         self.assertEqual(job.url, "https://www.indeed.com/viewjob?jk=54321")
         self.assertEqual(job.posted_time.day, 15)
+
+    def test_arbeitnow_parsing(self):
+        handler = ArbeitnowHandler("Arbeitnow", "*", ["Android", "Flutter"], 24)
+        raw_job = {
+            "title": "Senior Android Developer",
+            "company_name": "TechCorp GmbH",
+            "location": "Berlin, Germany",
+            "url": "https://www.arbeitnow.com/jobs/techcorp-android-123",
+            "description": "We offer full visa sponsorship and relocation assistance.",
+            "remote": False,
+            "tags": ["Android", "Kotlin", "Visa-Sponsorship"],
+            "created_at": 1788295528
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "TechCorp GmbH")
+        self.assertEqual(job.title, "Senior Android Developer")
+        self.assertTrue(job.has_visa_sponsorship)
+        self.assertTrue(job.has_relocation)
+
+    def test_wearedevelopers_parsing(self):
+        handler = WeAreDevelopersHandler("WeAreDevelopers", "*", ["Android"], 24)
+        raw_job = {
+            "title": "Lead Android Platform Engineer",
+            "company": "Logitech",
+            "location": "Munich, Germany",
+            "url": "https://www.wearedevelopers.com/jobs/ext/2584214",
+            "age_text": "2 hours ago",
+            "tags": ["Android", "Kotlin", "Git"]
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Logitech")
+        self.assertEqual(job.title, "Lead Android Platform Engineer")
+        self.assertEqual(job.location, "Munich, Germany")
+
+    def test_compound_rules_matching(self):
+        rules = [
+            {
+                "title_keywords": ["Senior Android Developer"],
+                "context_keywords": ["visa sponsorship"]
+            },
+            {
+                "title_keywords": ["Senior App Developer"],
+                "context_keywords": ["relocation provided"]
+            },
+            {
+                "title_keywords": ["App Developer"],
+                "context_keywords": ["english speaking"]
+            }
+        ]
+        handler = DummyHandler("Test", "*", [], 24, compound_rules=rules)
+        
+        j1 = Job("Co", "Senior Android Developer", "Berlin", "https://x.com/1", datetime.now(timezone.utc), description="Offers visa sponsorship")
+        j2 = Job("Co", "Senior App Developer", "Munich", "https://x.com/2", datetime.now(timezone.utc), description="Relocation provided for candidates")
+        j3 = Job("Co", "App Developer", "Berlin", "https://x.com/3", datetime.now(timezone.utc), description="English speaking environment")
+        j4_neg = Job("Co", "Junior Web Dev", "Berlin", "https://x.com/4", datetime.now(timezone.utc), description="visa sponsorship")
+        
+        self.assertTrue(handler.matches_compound(j1))
+        self.assertTrue(handler.matches_compound(j2))
+        self.assertTrue(handler.matches_compound(j3))
+        self.assertFalse(handler.matches_compound(j4_neg))
+        self.assertTrue(handler.matches_location(j1.location, j1.title, j1))
+
+    def test_germantechjobs_parsing(self):
+        handler = GermanTechJobsHandler("GermanTechJobs", "*", ["Android"], 24)
+        raw_job = {
+            "title": "Senior Android Engineer",
+            "company": "AutoTech Berlin",
+            "location": "Berlin",
+            "url": "/job/12345-senior-android-engineer",
+            "description": "Visa sponsorship offered",
+            "tags": ["Android", "Kotlin"]
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.title, "Senior Android Engineer")
+        self.assertEqual(job.company, "AutoTech Berlin")
+        self.assertEqual(job.url, "https://germantechjobs.de/job/12345-senior-android-engineer")
+        self.assertTrue(job.has_visa_sponsorship)
+
+    def test_relocateme_parsing(self):
+        handler = RelocateMeHandler("Relocate.me", "*", ["Mobile"], 24)
+        raw_job = {
+            "title": "Lead Mobile App Developer",
+            "url": "https://relocate.me/jobs/54321",
+            "description": "Relocation assistance provided",
+            "pubDate": "Wed, 02 Sep 2026 08:00:00 +0000"
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.title, "Lead Mobile App Developer")
+        self.assertEqual(job.url, "https://relocate.me/jobs/54321")
+        self.assertTrue(job.has_relocation)
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,10 +12,16 @@ from handlers.jooble import JoobleHandler
 from handlers.flexjobs import FlexjobsHandler
 from handlers.linkedin import LinkedInHandler
 from handlers.indeed import IndeedHandler
+from handlers.arbeitnow import ArbeitnowHandler
+from handlers.wearedevelopers import WeAreDevelopersHandler
+from handlers.germantechjobs import GermanTechJobsHandler
+from handlers.relocateme import RelocateMeHandler
 
 __all__ = [
     "BaseHandler", "Job", "GreenhouseHandler", "LeverHandler", "FallbackHandler",
     "AshbyHandler", "WorkdayHandler", "WorkableHandler", "SmartRecruitersHandler",
     "JobhiveAdapterHandler", "AdzunaHandler", "JoobleHandler", "FlexjobsHandler",
-    "LinkedInHandler", "IndeedHandler"
+    "LinkedInHandler", "IndeedHandler", "ArbeitnowHandler", "WeAreDevelopersHandler",
+    "GermanTechJobsHandler", "RelocateMeHandler"
 ]
+
