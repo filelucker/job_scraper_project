@@ -1,0 +1,185 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[left=0.5in, right=0.5in, top=0.5in, bottom=0.5in]{geometry}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\definecolor{linkcolor}{HTML}{0B57D0}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=linkcolor,
+    urlcolor=linkcolor,
+    filecolor=linkcolor,
+    citecolor=linkcolor
+}
+\usepackage{titlesec}
+\usepackage{multicol}
+
+% Sections formatting for ATS readability
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titlespacing{\section}{0pt}{10pt}{6pt}
+
+\setlength{\parindent}{0pt}
+\setlist[itemize]{noitemsep, topsep=0pt, leftmargin=1.2em}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \textbf{Md Moniruzzaman}} \\
+    \vspace{4pt}
+    Dhaka, Bangladesh $|$ \href{mailto:contact@moniruz.dev}{contact@moniruz.dev} $|$ +8801721915013 \\
+    \href{https://github.com/filelucker}{GitHub} $|$ \href{https://www.linkedin.com/in/mon000/}{LinkedIn} $|$ \href{https://moniruz.dev/}{Portfolio} \\
+    \vspace{2pt}
+\end{center}
+
+\section*{PROFESSIONAL SUMMARY}
+<<<PROFESSIONAL_SUMMARY>>>
+
+\section*{CORE COMPETENCIES}
+\begin{itemize}
+    \begin{multicols}{2}
+<<<CORE_COMPETENCIES>>>
+    \end{multicols}
+\end{itemize}
+
+\section*{TECHNICAL SKILLS}
+<<<TECHNICAL_SKILLS>>>
+
+\vspace{4pt}
+
+\section*{PROFESSIONAL EXPERIENCE}
+
+\textbf{Senior App Developer} \hfill Aug 2023 -- Present \\
+\textit{DG Infotech Ltd. (DGePay, Concern of Dipon Group), Dhaka} \\
+\textbf{Tech Stack:} Kotlin, React Native, REST API, Firebase, CI/CD, MVVM
+\begin{itemize}
+\item \textbf{Architected a highly scalable modular structure} for fintech apps (DGePay Bekti \& Saudagor) supporting \textbf{10k+ merchants}, integrating QR codes, digital wallets, and real-time bank transfers.    
+\item Optimized checkout speed by \textbf{50\%} and reduced app crash rates by \textbf{30\%} through proactive debugging.
+\item Streamlined the CI/CD pipeline, reducing deployment cycles by \textbf{35\%} while maintaining \textbf{99.9\% uptime} and ensuring full \textbf{PCI-DSS compliance}.    
+\item Improved merchant activation by \textbf{18\%} and user retention by \textbf{22\%} through UX redesign.
+\end{itemize}
+
+\vspace{6pt}
+
+\textbf{Senior Android Developer} \hfill Dec 2022 -- Jul 2023 \\
+\textit{shurjoMukhi Ltd., Dhaka} \\
+\textbf{Tech Stack:} Kotlin, Java, Coroutines, Hilt, Retrofit, Jetpack
+\begin{itemize}
+    \item Managed cross-platform (Android, iOS, Web) development, achieving \textbf{95\% on-time delivery} for sprint goals.
+    \item Mentored \textbf{5+ developers} and introduced code review cultures, reducing post-release bugs by \textbf{30\%}.
+    \item Migrated legacy modules to \textbf{Kotlin} and reduced app load times by \textbf{20\%} via performance profiling.
+\end{itemize}
+
+\vspace{6pt}
+
+\textbf{Software Engineer — Mobile Application} \hfill Jan 2021 -- Nov 2022 \\
+\textit{Dnet, Dhaka} \\
+\textbf{Tech Stack:} Flutter, Dart, SQLite, BLoC, Offline-First Architecture
+\begin{itemize}
+    \item Developed UNICEF-backed health apps supporting \textbf{1k+ downloads} with a focus on high reliability.
+    \item \textbf{Engineered an offline-first architecture} and lightweight data collection framework for low-bandwidth environments, boosting field worker productivity by \textbf{35\%}.
+    \item Ensured international \textbf{GDPR-equivalent} data privacy compliance and implemented multi-language localization.
+\end{itemize}
+
+\vspace{6pt}
+
+\textbf{Software Engineer} \hfill May 2018 -- Dec 2020 \\
+\textit{HAL Technologies Ltd., Dhaka} \\
+\textbf{Tech Stack:} Java, C\#, Biometric SDKs, SQL Server, SDK Integration
+\begin{itemize}
+    \item \textbf{Engineered a high-concurrency POS system} with online/offline synchronization and integrated thermal printers/ATMs via custom SDK wrappers.
+    \item Developed a \textbf{biometric attendance system} (RemaTea) handling 2,000+ daily fingerprint logs, optimizing hardware-software communication for tea estate operations.
+    \item Optimized payment APIs and DB schemas, reducing transaction latency by \textbf{30\%} while maintaining \textbf{80\%+ code coverage} through rigorous unit testing.
+\end{itemize}
+
+\section*{KEY PROJECTS}
+
+\textbf{DGePay Platform (FinTech)} $|$ \textit{React Native} \hfill \href{https://apps.apple.com/us/app/dgepay-bekti/id6456410767}{iOS Customer} $|$ \href{https://apps.apple.com/us/app/dgepay-saudagor/id6456410810}{iOS Merchant}
+\begin{itemize}
+    \item Supports \textbf{10K+ merchants} and processes high-volume daily transactions with \textbf{99.9\% reliability}.
+    \item Integrated multi-channel payment ecosystems including digital wallets and \textbf{Bangla QR} for seamless interoperability.
+\end{itemize}
+
+\vspace{4pt}
+
+\textbf{Public Procurement (Govt. Utility)} $|$ \textit{Native Android} \hfill \href{https://play.google.com/store/apps/details?id=com.cptu}{Play Store}
+\begin{itemize}
+    \item Engineered the official CPTU (Govt. of Bangladesh) app for real-time tracking of national e-GP and offline tenders.
+    \item Integrated eProcure data systems to provide awardee lists and legal documents to thousands of active users.
+\end{itemize}
+
+\vspace{4pt}
+
+\textbf{UNICEF Adolescent Health App} $|$ \textit{Flutter} \hfill \href{https://play.google.com/store/apps/details?id=com.dnet.unice.adolescent}{Android} $|$ \href{https://apps.apple.com/us/app/adolescent-health/id1569604494}{iOS}
+\begin{itemize}
+    \item Reached \textbf{1k+ downloads}; reduced cross-platform development costs by \textbf{40\%} using Flutter.
+    \item Optimized for low-bandwidth regions, providing critical physical and mental health resources to youth in Bangladesh.
+\end{itemize}
+
+\vspace{4pt}
+
+\textbf{praniSheba (IoT \& AgriTech)} $|$ \textit{Native Android} \hfill \href{https://play.google.com/store/apps/details?id=com.sm.cattleshurjohms}{Play Store}
+\begin{itemize}
+    \item Integrated \textbf{IoT and RFID technology} to track cattle genetics, health, and reproduction for rural farmers.
+    \item Developed a complex module for \textbf{Cattle Weight Calculation} using image recognition and shape analysis.
+\end{itemize}
+
+\vspace{4pt}
+
+\textbf{Visual Compliance (Enterprise Security)} $|$ \textit{Xamarin/C\#} \hfill \href{https://apps.apple.com/us/app/descartes-visual-compliance/id1573783267}{iOS} $|$ \href{https://play.google.com/store/apps/details?id=com.descartes.VisualCompliance}{Android}
+\begin{itemize}
+    \item Developed a cross-platform hybrid application for \textbf{Descartes (Canada)} to manage airline offenses and permissions.
+    \item Implemented high-security protocols for confidential personnel usage within restricted premises.
+\end{itemize}
+
+\vspace{4pt}
+
+\textbf{MYCash (Digital Finance)} $|$ \textit{Native Android/iOS} \hfill \href{https://play.google.com/store/apps/details?id=com.mycash}{Android} $|$ \href{https://apps.apple.com/us/app/mycash/id1658736258}{iOS}
+\begin{itemize}
+    \item Built a dynamic digital financial service app reaching \textbf{100k+ downloads} and facilitating secured daily transactions for the mass market.
+    \item Focused on \textbf{encryption and secure API consumption} to ensure financial data integrity.
+\end{itemize}
+
+\section*{EDUCATION}
+
+\textbf{B.Sc. in Computer Science Engineering} \hfill 2018 \\
+Daffodil International University, Dhaka
+
+\vspace{2pt}
+
+\textbf{Diploma in Computer Technology} \hfill 2015 \\
+Bogra Polytechnic Institute
+
+\section*{CERTIFICATIONS}
+\textbf{Cloud \& AI/ML (Simplilearn)} \hfill 2025
+\begin{itemize}
+    \item \textbf{Amazon S3 Storage Classes:} Lifecycle management, cost optimization, and access control.
+    \item \textbf{Machine Learning with Python:} Supervised/Unsupervised learning and model evaluation.
+\end{itemize}
+
+\vspace{2pt}
+
+\textbf{Project Management \& Professional Skills (VUMI)} \hfill 2023
+\begin{itemize}
+    \item \textbf{Project Management Fundamentals:} Risk, cost, and change management within project constraints.
+    \item \textbf{Corporate Networking:} Team leadership, negotiation, and client relationship management.
+\end{itemize}
+
+\vspace{2pt}
+
+\textbf{Software Engineering Foundations}
+\begin{itemize}
+    \item \textbf{C\# ASP.NET MVC-5 (300 Hours):} LICT Project of BCC (Bdjobs Training) \hfill 2017
+    \item \textbf{Android App Development:} RR Foundation, Dhaka \hfill 2015
+\end{itemize}
+
+\section*{ADDITIONAL TRAINING}
+\textbf{Cloud \& Systems:} AWS (EC2, Lambda), CCNA Routing \& Switching, Kali Linux Basics \\
+\textbf{Programming \& Digital:} C Programming, PHP, AI Beginners Guide, Digital Marketing
+
+\section*{AWARDS \& LEADERSHIP}
+\textbf{Recognition:} Awarded by Bogura DC Office (Govt. of Bangladesh) for Mobile App Development. \\
+\textbf{Volunteer:} Digital Innovation Fair, Bangladesh — Technical Advisor \& Contributor. \\
+\textbf{Languages:} English (Professional), Bengali (Native), Hindi (Spoken), Urdu (Spoken).
+
+\end{document}

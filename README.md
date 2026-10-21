@@ -133,3 +133,27 @@ The scraper comes pre-configured to run automatically.
 The action in [.github/workflows/job_scraper.yml](file:///d:/Projects/job_scraper_project/.github/workflows/job_scraper.yml) will trigger:
 - Automatically at **08:00 UTC** every day.
 - On-demand via the **Run workflow** button on the GitHub Actions tab.
+
+---
+
+## Automated Tailored Applications (Email + CV)
+
+The scraper can automatically tailor your master LaTeX resume ([`templates/resume_template.tex`](file:///d:/Projects/job_scraper_project/templates/resume_template.tex)), compile it using `tectonic.exe`, send an application email, and track statuses in Google Sheets.
+
+### Configuration (`.env`)
+```ini
+AUTO_APPLY_ENABLED=true
+AUTO_APPLY_MODE=review        # Options: review, auto, dry_run
+DRY_RUN=false
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=contact@moniruz.dev
+SMTP_PASSWORD=your_app_password
+SENDER_NAME="Md Moniruzzaman"
+GEMINI_API_KEY=your_gemini_api_key  # Optional: For AI tailoring (falls back to smart heuristics)
+```
+
+### Application Modes
+- **`review` (Recommended default):** Generates the tailored PDF CV and draft email, marks status as `Drafted (Review Required)` in Google Sheets, and sends the PDF & pitch to Telegram for your review.
+- **`auto`:** Compiles the tailored PDF, sends the application email via SMTP, updates Google Sheets status to `Applied` with timestamp, and notifies you on Telegram.
+- **`dry_run`:** Simulates the entire process without sending real emails.

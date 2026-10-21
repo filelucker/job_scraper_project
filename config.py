@@ -31,13 +31,13 @@ KEYWORDS = [
     "AI App Developer",
     "AI Mobile Developer",
     "Mobile AI Engineer",
-    "AI Engineer",
-    "AI Integration Engineer",
-    "Applied AI Engineer",
-    "AI Software Engineer",
-    "LLM Engineer",
-    "LLM Application Developer",
-    "GenAI Engineer",
+    # "AI Engineer",
+    "Mobile AI Integration Engineer",
+    # "Applied AI Engineer",
+    "Mobile AI Software Engineer",
+    # "LLM Engineer",
+    # "LLM Application Developer",
+    # "GenAI Engineer",
 
     # # Full Stack
     # "Full Stack Developer",
@@ -1324,3 +1324,17 @@ APIFY_INDEED_ACTOR = os.getenv("APIFY_INDEED_ACTOR", "misceres/indeed-scraper")
 APIFY_LINKEDIN_LOCATION = os.getenv("APIFY_LINKEDIN_LOCATION", "Remote")
 APIFY_INDEED_LOCATION = os.getenv("APIFY_INDEED_LOCATION", "Remote")
 APIFY_INDEED_COUNTRY = os.getenv("APIFY_INDEED_COUNTRY", "US")
+
+# ==========================================
+# 4. Auto-Apply & Resume Tailoring Settings
+# ==========================================
+AUTO_APPLY_ENABLED = os.getenv("AUTO_APPLY_ENABLED", "false").lower() in ("true", "1", "yes")
+AUTO_APPLY_MODE = os.getenv("AUTO_APPLY_MODE", "review").lower()  # "review", "auto", "dry_run"
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SENDER_NAME = os.getenv("SENDER_NAME", "Md Moniruzzaman")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("true", "1", "yes")

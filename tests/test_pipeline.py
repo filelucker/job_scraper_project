@@ -227,7 +227,10 @@ class TestPipeline(unittest.TestCase):
             self.assertTrue(success)
             
             # Check headers written
-            expected_headers = ["Company", "Title", "Location", "URL", "Actual Post Date", "Date Found", "this job accepts candidate worldwide or not"]
+            expected_headers = [
+                "Company", "Title", "Location", "URL", "Actual Post Date", "Date Found",
+                "this job accepts candidate worldwide or not", "Contact Email", "Application Status", "Applied At"
+            ]
             mock_worksheet.append_row.assert_called_once_with(expected_headers)
             
             # Check values appended

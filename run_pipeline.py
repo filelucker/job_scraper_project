@@ -28,7 +28,17 @@ from config import (
     GERMANTECHJOBS_COOKIE,
     JOBCOPILOT_TOKEN,
     RELOCATEME_COOKIE,
-    RELOCATEME_FEED_URL
+    RELOCATEME_FEED_URL,
+    AUTO_APPLY_ENABLED,
+    AUTO_APPLY_MODE,
+    SMTP_HOST,
+    SMTP_PORT,
+    SMTP_USER,
+    SMTP_PASSWORD,
+    SENDER_NAME,
+    GEMINI_API_KEY,
+    OPENAI_API_KEY,
+    DRY_RUN
 )
 from handlers import (
     GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler,
@@ -36,7 +46,10 @@ from handlers import (
     AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler,
     ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler
 )
-from routers import TelegramRouter, GoogleSheetsRouter
+from handlers.email_extractor import JobEmailExtractor
+from routers import TelegramRouter, GoogleSheetsRouter, EmailRouter
+from ai.tailor import ResumeTailor
+from services.compiler import LatexCompiler
 
 # Pre-import key packages to avoid thread import lock contention / deadlocks during concurrent scans
 try:
@@ -337,6 +350,17 @@ def main():
         else:
             print("No matches found. Skipping deduplication and export.")
 
+        # --- Enrich jobs with application method / email detection ---
+        if new_jobs:
+            print("\nAnalyzing application channels for new jobs...")
+            for job in new_jobs:
+                analysis = JobEmailExtractor.analyze_job(job)
+                job["Contact Email"] = analysis.get("email") or ""
+                job["Application Status"] = analysis.get("initial_status", "Pending")
+                job["apply_method"] = analysis.get("apply_method", "WEB_PORTAL")
+                if job["Contact Email"]:
+                    print(f"  • {job.get('Company')} -> Application Email found: {job['Contact Email']}")
+
         # --- 1. Route findings to Google Sheets ---
         if new_jobs and GOOGLE_CREDENTIALS_JSON and sheets_active:
             print("\nExporting new matches to Google Sheets...")
@@ -385,6 +409,107 @@ def main():
                 print(f"[ERROR] Exception during Telegram routing: {e}", file=sys.stderr)
         else:
             print("\nTelegram Bot Token/Chat ID not set. Skipping Telegram routing.")
+
+        # --- 3. Auto-Apply & Customized CV Pipeline ---
+        if new_jobs and AUTO_APPLY_ENABLED:
+            email_jobs = [j for j in new_jobs if j.get("Contact Email")]
+            if email_jobs:
+                print(f"\n[Auto-Apply] Processing {len(email_jobs)} job(s) with direct application email(s) in '{AUTO_APPLY_MODE}' mode...")
+                tailor = ResumeTailor(gemini_api_key=GEMINI_API_KEY, openai_api_key=OPENAI_API_KEY)
+                compiler = LatexCompiler()
+                email_router = EmailRouter(
+                    smtp_host=SMTP_HOST,
+                    smtp_port=SMTP_PORT,
+                    smtp_user=SMTP_USER,
+                    smtp_password=SMTP_PASSWORD,
+                    sender_name=SENDER_NAME,
+                    dry_run=(AUTO_APPLY_MODE == "dry_run" or DRY_RUN)
+                )
+
+                for job in email_jobs:
+                    company = job.get("Company", "Company")
+                    title = job.get("Title", "Job")
+                    contact_email = job.get("Contact Email")
+                    print(f"\n[Auto-Apply] Tailoring application for {company} - {title} ({contact_email})...")
+
+                    # 1. Tailor CV content and email pitch
+                    tailored = tailor.tailor(job)
+
+                    # 2. Render & Compile PDF
+                    safe_company = "".join(c for c in company if c.isalnum() or c in (' ', '_', '-')).strip().replace(' ', '_')
+                    output_dir = "output_resumes"
+                    os.makedirs(output_dir, exist_ok=True)
+                    pdf_path = os.path.join(output_dir, f"Resume_Moniruzzaman_{safe_company}.pdf")
+
+                    rendered_latex = compiler.render_latex(
+                        summary=tailored.get("summary"),
+                        competencies=tailored.get("competencies"),
+                        skills=tailored.get("skills")
+                    )
+                    compile_ok = compiler.compile_pdf(rendered_latex, pdf_path)
+                    if not compile_ok:
+                        print(f"[Auto-Apply] PDF compilation failed for {company}. Falling back to default resume.")
+                        pdf_path = "master_resume.pdf"
+                        if not os.path.exists(pdf_path):
+                            compiler.compile_pdf(compiler.render_latex(), pdf_path)
+
+                    # 3. Action based on mode
+                    if AUTO_APPLY_MODE == "auto":
+                        res = email_router.send_application(
+                            recipient_email=contact_email,
+                            subject=tailored["email_subject"],
+                            body_text=tailored["email_body_text"],
+                            body_html=tailored["email_body_html"],
+                            pdf_path=pdf_path,
+                            attachment_filename=f"Md_Moniruzzaman_Resume_{safe_company}.pdf"
+                        )
+                        new_status = "Applied" if res["success"] else "Failed (Email Error)"
+                        if sheets_active and GOOGLE_CREDENTIALS_JSON:
+                            sheets_router.update_application_status(job["URL"], new_status, contact_email=contact_email)
+                        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+                            try:
+                                tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+                                tg.send_message(f"🚀 *Application Dispatched:*\n• *Company*: {company}\n• *Role*: {title}\n• *Sent To*: `{contact_email}`\n• *Status*: {new_status}")
+                                tg.send_document(pdf_path, caption=f"Tailored CV for {company}")
+                            except Exception as tg_err:
+                                print(f"[Auto-Apply] Failed sending Telegram update: {tg_err}")
+
+                    elif AUTO_APPLY_MODE == "review":
+                        new_status = "Drafted (Review Required)"
+                        if sheets_active and GOOGLE_CREDENTIALS_JSON:
+                            sheets_router.update_application_status(job["URL"], new_status, contact_email=contact_email)
+                        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+                            try:
+                                tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+                                review_msg = (
+                                    f"📝 *Application Draft Prepared:*\n"
+                                    f"• *Company*: {company}\n"
+                                    f"• *Role*: {title}\n"
+                                    f"• *Email*: `{contact_email}`\n"
+                                    f"• *Subject*: {tailored['email_subject']}\n\n"
+                                    f"Tailored CV and application draft attached."
+                                )
+                                tg.send_message(review_msg)
+                                tg.send_document(pdf_path, caption=f"Tailored CV for {company}")
+                            except Exception as tg_err:
+                                print(f"[Auto-Apply] Failed sending Telegram review draft: {tg_err}")
+
+                    elif AUTO_APPLY_MODE == "dry_run":
+                        res = email_router.send_application(
+                            recipient_email=contact_email,
+                            subject=tailored["email_subject"],
+                            body_text=tailored["email_body_text"],
+                            body_html=tailored["email_body_html"],
+                            pdf_path=pdf_path,
+                            attachment_filename=f"Md_Moniruzzaman_Resume_{safe_company}.pdf"
+                        )
+                        new_status = "Simulated (Dry Run)"
+                        if sheets_active and GOOGLE_CREDENTIALS_JSON:
+                            sheets_router.update_application_status(job["URL"], new_status, contact_email=contact_email)
+            else:
+                print("\n[Auto-Apply] No new jobs contained direct application emails. (All require web forms).")
+        elif new_jobs and not AUTO_APPLY_ENABLED:
+            print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/emailing.")
 
         print("\n=== Pipeline finished ===")
 
