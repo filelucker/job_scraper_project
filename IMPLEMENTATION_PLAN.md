@@ -1,6 +1,6 @@
-# Implementation Plan: Automated Tailored Job Application Pipeline
+# Implementation Plan: Automated ATS & Web Form Job Application Pipeline
 
-This document outlines the step-by-step engineering plan to extend `job_scraper_project` to automatically generate customized resumes, dispatch email applications with tailored cover letters, and track application statuses directly in Google Sheets / Excel.
+This document defines the comprehensive engineering plan to automate job applications across Applicant Tracking Systems (**Greenhouse, Lever, Ashby, Workday**) and direct email listings.
 
 ---
 
@@ -8,121 +8,100 @@ This document outlines the step-by-step engineering plan to extend `job_scraper_
 
 ```mermaid
 flowchart TD
-    A[Scraped Job Details] --> B{Email Found?}
-    B -- No --> C[Mark Sheet: 'No Email / Portal Only']
-    B -- Yes --> D[AI Tailoring Engine]
+    A[Scraped Job Post] --> B{Application Channel}
     
-    subgraph Customization
-        D -->|Job Context + Master Resume| E[Tailored LaTeX & Cover Letter]
-        E --> F[Tectonic LaTeX Compiler]
-        F --> G[Tailored PDF Resume]
+    B -- Greenhouse Job --> C[Greenhouse API Submitter]
+    B -- Lever Job --> D[Lever API Submitter]
+    B -- Direct Email Listing --> E[Email Dispatcher]
+    B -- Other ATS / Web Portal --> F[Playwright AI Form Agent]
+    
+    subgraph Pre-Application Engine
+        G[Job Description + Master Resume] --> H[AI Tailoring Engine]
+        H --> I[Tectonic LaTeX Compiler]
+        I --> J[Tailored PDF Resume]
     end
     
-    G --> H{Execution Mode}
-    H -- 'review' --> I[Telegram Preview & Approval Draft]
-    H -- 'auto' --> J[SMTP Email Dispatcher]
+    C --> K{Execution Mode}
+    D --> K
+    E --> K
+    F --> K
     
-    I -->|User Approves| J
-    J --> K[Update Google Sheet Row]
-    K --> L[Application Status: 'Applied' + Timestamp]
+    K -- 'dry_run' --> L[Simulate & Verify Form Fields]
+    K -- 'review' --> M[Telegram Preview: Attached Tailored PDF + Screenshot + Apply Link]
+    K -- 'auto' --> N[Direct Submit]
+    
+    M -->|User Approves| N
+    N --> O[Update Google Sheet Row]
+    O --> P[Status: 'Applied (ATS)' + BST Timestamp]
 ```
 
 ---
 
-## 2. Master CV Analysis & Strategy
+## 2. Channels & Submitter Modules
 
-The master CV is located at `master_resume.tex`:
-- **Candidate:** Md Moniruzzaman (Senior Mobile Application Engineer)
-- **Primary Strengths:** 7+ years experience, Dual-Platform Native (Kotlin/Android, Swift/iOS) + Cross-Platform (Flutter, React Native), FinTech / PCI-DSS compliance, system design.
-- **Compilation Engine:** `tectonic.exe` is already installed and verified on the local machine (`C:\Users\mzama\AppData\Local\tectonic\tectonic.exe`), compiling clean PDFs in ~1-2 seconds with zero external package installations required.
-
-### Sections to Dynamically Tailor
-To maximize ATS match score while preventing LaTeX syntax errors:
-1. **Professional Summary:** Tailored 3-4 sentence summary emphasizing the specific stack requested in the job (e.g., Lead Android vs. Full-stack Mobile vs. React Native vs. Flutter).
-2. **Core Competencies:** Dynamic reordering of the top 8 competencies matching keywords in the job description.
-3. **Technical Skills Order:** Putting the job's target language/framework first in the skill breakdown.
-4. **Key Projects & Experience Focus:** Subtle highlighting of the most relevant apps (e.g., DGePay for FinTech, UNICEF for Offline-first/HealthTech, Visual Compliance for Enterprise).
+### Phase 1: Candidate Profile & Field Normalization (`candidate_profile.json`)
+- Centralized candidate schema containing:
+  - Personal Information (`full_name`, `first_name`, `last_name`, `email`, `phone`, `location`)
+  - Web & Social Links (`linkedin`, `github`, `portfolio`)
+  - Screening Question Defaults (`work_authorization`, `sponsorship`, `notice_period`, `years_of_experience`)
+- Automated lookup helper `services/profile_loader.py` to feed all submitters.
 
 ---
 
-## 3. Implementation Phases & Modules
-
-### Phase 1: Storage & LaTeX Templating (`templates/`)
-- **Deliverable:** `templates/resume_template.tex`
-- Extract parameterized tokens or Jinja2 markers into the resume template:
-  - `{{ PROFESSIONAL_SUMMARY }}`
-  - `{{ CORE_COMPETENCIES }}`
-  - `{{ TECHNICAL_SKILLS }}`
-- Provide a safe LaTeX escaping utility (`latex_escape(text)`) to prevent compilation breaks caused by special characters (`&`, `%`, `$`, `#`, `_`, `{`, `}`).
-
----
-
-### Phase 2: Email Extraction & Enrichment Module (`handlers/email_extractor.py`)
-- **Deliverable:** Extract recipient emails from:
-  1. Job descriptions (regex pattern: `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`).
-  2. Domain heuristics (e.g., if company is `example.com`, check for explicit `careers@example.com` or `jobs@example.com` in listing text).
-- Classify jobs into:
-  - `EMAIL_DIRECT`: Has a verified application email.
-  - `ATS_PORTAL`: Standard Greenhouse, Lever, Workday, Ashby link requiring web forms.
+### Phase 2: Greenhouse Direct API Submitter (`services/apply_greenhouse.py`)
+- Greenhouse powers ~35% of high-growth tech companies and provides an API endpoint:
+  - `POST https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs/{job_id}`
+- Submits multipart form payload:
+  - `first_name`, `last_name`, `email`, `phone`
+  - `resume` (uploaded tailored PDF binary)
+  - `urls[LinkedIn]`, `urls[GitHub]`, `urls[Portfolio]`
+- Does not require a browser, immune to Cloudflare/browser crashes, executes in `< 1.5 seconds`.
+- Supports dry run validation mode.
 
 ---
 
-### Phase 3: AI Tailoring Engine (`ai/tailor.py`)
-- **Deliverable:** AI agent supporting Gemini API (and OpenAI API fallback) to produce:
-  1. **Tailored LaTeX Segments:** Generates compliant LaTeX syntax replacing the summary and skills.
-  2. **Personalized Email Pitch:**
-     - **Subject Line:** `Application for {job_title} - Md Moniruzzaman`
-     - **Body:** Engaging 3-paragraph email referencing specific company requirements and linking relevant live store apps (DGePay, UNICEF, etc.).
-- Prompts will enforce strict JSON output schema containing:
-  - `latex_summary`: Validated LaTeX string.
-  - `email_subject`: Short, professional subject.
-  - `email_body_text`: Plain text email.
-  - `email_body_html`: Styled HTML email with clickable portfolio links.
+### Phase 3: Lever Direct Form Submitter (`services/apply_lever.py`)
+- Lever powers ~25% of tech listings:
+  - Form endpoint: `POST https://jobs.lever.co/{company}/{job_id}/apply`
+- Direct payload submission:
+  - `name`, `email`, `phone`, `org` (current company)
+  - `urls[LinkedIn]`, `urls[GitHub]`, `urls[Portfolio]`
+  - `comments` (custom cover note / pitch generated by Gemini)
+  - `resume` (uploaded tailored PDF binary)
+- Ultra-fast, zero browser overhead.
 
 ---
 
-### Phase 4: PDF Compiler Service (`services/compiler.py`)
-- **Deliverable:** Lightweight Python wrapper around `tectonic.exe`:
-  - Input: Tailored `.tex` string and target output path `generated_cvs/CV_Moniruzzaman_{Company}_{JobId}.pdf`.
-  - Compiles headless without cluttering root directory.
-  - Handles timeout and compilation error fallbacks (reverting to baseline `master_resume.pdf` if compilation fails).
+### Phase 4: Playwright Universal Web Form Agent (`services/apply_browser.py`)
+- For Ashby, Workday, YC company career portals, and custom web forms:
+- Uses headless/headed Chromium via Playwright:
+  1. Navigates to job application page.
+  2. Identifies standard input selectors:
+     - Name fields: `input[name*="name"], input[id*="name"]`
+     - Email fields: `input[type="email"], input[name*="email"]`
+     - Phone fields: `input[type="tel"], input[name*="phone"]`
+     - File upload: `input[type="file"]` (attaches tailored PDF)
+  3. Custom screening questions:
+     - Uses Gemini API (`ai/tailor.py`) to generate contextual answers based on `candidate_profile.json` (e.g. visa sponsorship, years of Kotlin/Swift experience).
+  4. Review & Safety:
+     - In `review` mode: takes a full-page screenshot of filled form, sends to Telegram, and provides link for 1-click submission.
+     - In `auto` mode: clicks the submit button and logs confirmation.
+     - In `dry_run` mode: fills form, saves screenshot, closes browser without submitting.
 
 ---
 
-### Phase 5: Email Dispatch Router (`routers/email_router.py`)
-- **Deliverable:** SMTP client supporting standard Gmail App Passwords, Outlook, or transactional providers (Resend / SendGrid).
-- **Features:**
-  - MIME multipart (HTML body + Plaintext fallback).
-  - PDF CV attachment with clean naming (`Md_Moniruzzaman_Resume_{Company}.pdf`).
-  - Rate limiting & backoff safeguards (e.g. max 5 emails/minute, randomized delays).
-  - Safety check: `DRY_RUN` flag in `.env` to test without actually sending.
+### Phase 5: Unified Auto-Apply Dispatcher (`services/apply_dispatcher.py`)
+- Analyzes each matched job:
+  - Detects ATS signature (`greenhouse`, `lever`, `email`, `web_portal`).
+  - Calls `ResumeTailor` to generate tailored summary, skills, and pitch.
+  - Calls `LatexCompiler` to produce the tailored PDF.
+  - Routes to the appropriate submitter (`apply_greenhouse`, `apply_lever`, `email_router`, or `apply_browser`).
+  - Tracks status in Google Sheets & Telegram.
 
 ---
 
-### Phase 6: Sheet & State Schema Extension (`routers/sheets.py`)
-- **Deliverable:** Extend existing Google Sheets headers in `routers/sheets.py`:
-  - **Existing:** `["Company", "Title", "Location", "URL", "Actual Post Date", "Date Found", "Worldwide"]`
-  - **New Columns Added:**
-    - `Contact Email`: Target recipient.
-    - `Application Status`: `Applied`, `Drafted (Awaiting Review)`, `No Email (Apply via Link)`, `Failed`.
-    - `Applied Date`: Timestamp in 12-hour AM/PM BST format.
-    - `Resume Version`: Link or filename of the tailored CV.
-- Add `update_job_status(job_url, status, email, timestamp)` to `GoogleSheetsRouter`.
-
----
-
-### Phase 7: Pipeline Integration & Approval Modes (`run_pipeline.py`)
-- **Deliverable:** Integration into the main execution cycle:
-  - Configuration in `.env`:
-    - `AUTO_APPLY_ENABLED=True`
-    - `AUTO_APPLY_MODE=review` (Options: `review`, `auto`, `dry_run`)
-    - `SMTP_USER=contact@moniruz.dev` (or Gmail address)
-    - `SMTP_PASSWORD=...`
-    - `SMTP_HOST=smtp.gmail.com`
-    - `SMTP_PORT=587`
-    - `GEMINI_API_KEY=...`
-  - **Review Mode Flow:** When a new job with an email is found, compile the CV and send a Telegram message with:
-    - Job Title & Company
-    - Recipient email & generated email draft
-    - Attached generated PDF
-    - Command or approval trigger to send.
+### Phase 6: Mode Safeguards & Verification
+- Controlled via `.env`:
+  - `AUTO_APPLY_ENABLED=True`
+  - `AUTO_APPLY_MODE=review` (Options: `review`, `auto`, `dry_run`)
+- Comprehensive unit and integration test suite (`tests/test_auto_apply.py`).

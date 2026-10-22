@@ -1,0 +1,27 @@
+{
+  "first_name": "Md",
+  "last_name": "Moniruzzaman",
+  "full_name": "Md Moniruzzaman",
+  "email": "contact@moniruz.dev",
+  "phone": "+8801721915013",
+  "location": "Dhaka, Bangladesh",
+  "city": "Dhaka",
+  "country": "Bangladesh",
+  "current_title": "Senior Mobile Application Engineer",
+  "years_of_experience": 7,
+  "urls": {
+    "linkedin": "https://www.linkedin.com/in/mon000/",
+    "github": "https://github.com/filelucker",
+    "portfolio": "https://moniruz.dev/"
+  },
+  "work_authorization": {
+    "authorized_in_us": false,
+    "requires_sponsorship": true,
+    "willing_to_relocate": true,
+    "notice_period": "Immediate / 2 weeks"
+  },
+  "summary": "Seasoned Senior Mobile Application Engineer with 7+ years of experience in system design & architecture, specializing in scalable mobile systems and high-performance applications across fintech, e-commerce, and healthtech.",
+  "top_skills": [
+    "Kotlin", "Android", "iOS", "Flutter", "Jetpack Compose", "System Design", "PCI-DSS", "Mobile Development"
+  ]
+}

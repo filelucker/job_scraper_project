@@ -1,42 +1,61 @@
-name: Daily Job Scraper Pipeline
+name: Automated Job Scraper & Auto-Apply Pipeline
 
 on:
   schedule:
-    # Run once daily at 08:00 UTC (8:00 AM UTC / 2:00 PM BST / 3:00 AM EST)
-    - cron: '0 8 * * *'
+    # Run every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+    - cron: '0 */6 * * *'
   workflow_dispatch:
-    # Allows manual execution from the GitHub Actions tab at any time
+    # Allows manual 1-click trigger from GitHub Actions tab
 
 jobs:
-  scrape-jobs:
+  run-pipeline:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip' # caching pip dependencies to speed up runs
+          cache: 'pip'
 
-      - name: Install Dependencies
+      - name: Install Tectonic LaTeX Compiler
+        uses: willemvds/setup-tectonic@v1
+
+      - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -r requirements.txt
 
-      - name: Run Job Scraper Pipeline
+      - name: Install Playwright Chromium Browser
+        run: |
+          python -m playwright install --with-deps chromium
+
+      - name: Execute Pipeline
         env:
-          # Set credentials from GitHub Repository Secrets
+          # Telegram Routing
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+          # Google Sheets Routing
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
-          GOOGLE_SHEET_NAME: ${{ secrets.GOOGLE_SHEET_NAME }}
-          GOOGLE_WORKSHEET_NAME: ${{ secrets.GOOGLE_WORKSHEET_NAME }}
+          GOOGLE_SHEET_NAME: ${{ secrets.GOOGLE_SHEET_NAME || 'Job Scraper Results' }}
+          GOOGLE_WORKSHEET_NAME: ${{ secrets.GOOGLE_WORKSHEET_NAME || 'Jobs' }}
+
+          # Auto-Apply & AI Tailoring
+          AUTO_APPLY_ENABLED: ${{ secrets.AUTO_APPLY_ENABLED || 'true' }}
+          AUTO_APPLY_MODE: ${{ secrets.AUTO_APPLY_MODE || 'review' }}
+          DRY_RUN: ${{ secrets.DRY_RUN || 'false' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+          # Job Board API Integrations
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
           JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
+          USAJOBS_API_KEY: ${{ secrets.USAJOBS_API_KEY }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
           APIFY_LINKEDIN_ACTOR: ${{ secrets.APIFY_LINKEDIN_ACTOR }}
           APIFY_INDEED_ACTOR: ${{ secrets.APIFY_INDEED_ACTOR }}
@@ -44,3 +63,11 @@ jobs:
           APIFY_INDEED_LOCATION: ${{ secrets.APIFY_INDEED_LOCATION }}
           APIFY_INDEED_COUNTRY: ${{ secrets.APIFY_INDEED_COUNTRY }}
         run: python run_pipeline.py
+
+      - name: Archive Generated Resumes & Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tailored-resumes
+          path: output_resumes/
+          retention-days: 14

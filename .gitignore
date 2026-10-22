@@ -22,10 +22,12 @@ secrets/
 *.json
 !requirements.txt
 !package.json
+!candidate_profile.json
 # Local log files and state caches
 pipeline.log
 scraped_jobs.json
 scraped_output.txt
+output_resumes/
 
 # Test & Coverage caches
 .pytest_cache/

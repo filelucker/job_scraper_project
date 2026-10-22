@@ -66,7 +66,9 @@ class Job:
             "Location": self.location,
             "URL": self.url,
             "Actual Post Date": actual_post_bst.strftime("%Y-%m-%d %H:%M:%S BST"),
-            "Date Found": date_found_bst.strftime("%Y-%m-%d %H:%M:%S BST")
+            "Date Found": date_found_bst.strftime("%Y-%m-%d %H:%M:%S BST"),
+            "description": self.description,
+            "tags": self.tags
         }
 
     def __repr__(self) -> str:
