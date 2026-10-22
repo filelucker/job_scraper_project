@@ -46,7 +46,7 @@ jobs:
 
           # Auto-Apply & AI Tailoring
           AUTO_APPLY_ENABLED: ${{ secrets.AUTO_APPLY_ENABLED || 'true' }}
-          AUTO_APPLY_MODE: ${{ secrets.AUTO_APPLY_MODE || 'review' }}
+          AUTO_APPLY_MODE: ${{ secrets.AUTO_APPLY_MODE || 'auto' }}
           DRY_RUN: ${{ secrets.DRY_RUN || 'false' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
