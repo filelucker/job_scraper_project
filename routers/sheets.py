@@ -118,7 +118,7 @@ class GoogleSheetsRouter:
                 worksheet.append_row(STANDARD_HEADERS)
             elif len(existing_records[0]) < len(STANDARD_HEADERS):
                 # Upgrade existing header row with the new tracking columns
-                worksheet.update('A1:J1', [STANDARD_HEADERS])
+                worksheet.update(range_name='A1:J1', values=[STANDARD_HEADERS])
 
             # Prepare rows to append
             rows_to_append = []
