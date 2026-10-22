@@ -19,7 +19,7 @@ class AutoApplyDispatcher:
         smtp_config: Optional[Dict[str, Any]] = None
     ):
         self.mode = mode
-        self.dry_run = (mode == "dry_run")
+        self.dry_run = (mode in ("dry_run", "review"))
         self.tailor = ResumeTailor(gemini_api_key=gemini_api_key, openai_api_key=openai_api_key)
         self.compiler = LatexCompiler()
         self.greenhouse_applier = GreenhouseApplier(dry_run=self.dry_run)
