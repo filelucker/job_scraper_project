@@ -392,26 +392,7 @@ def main():
             except Exception as e:
                 print(f"[Warning] Failed to write local state file '{local_state_file}': {e}", file=sys.stderr)
 
-        # --- 2. Route findings to Telegram (Sends update on EVERY run) ---
-        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-            print("\nDispatching alerts to Telegram...")
-            try:
-                telegram_router = TelegramRouter(
-                    bot_token=TELEGRAM_BOT_TOKEN,
-                    chat_id=TELEGRAM_CHAT_ID
-                )
-                formatted_msg = telegram_router.format_jobs_message(new_jobs)
-                telegram_success = telegram_router.send_message(formatted_msg)
-                if telegram_success:
-                    print("Telegram notification dispatched successfully.")
-                else:
-                    print("Telegram notification dispatch failed.")
-            except Exception as e:
-                print(f"[ERROR] Exception during Telegram routing: {e}", file=sys.stderr)
-        else:
-            print("\nTelegram Bot Token/Chat ID not set. Skipping Telegram routing.")
-
-        # --- 3. Auto-Apply & Customized CV Pipeline ---
+        # --- 2. Auto-Apply & Customized CV Pipeline ---
         if new_jobs and AUTO_APPLY_ENABLED:
             print(f"\n[Auto-Apply] Processing {len(new_jobs)} new job(s) via AutoApplyDispatcher in '{AUTO_APPLY_MODE}' mode...")
             dispatcher = AutoApplyDispatcher(
@@ -431,12 +412,16 @@ def main():
                 company = job.get("Company", "Company")
                 title = job.get("Title", "Job")
                 url = job.get("URL", "")
-                
+
                 try:
                     res = dispatcher.process_job(job)
                     status_text = res.get("status", "Processed")
                     pdf_path = res.get("pdf_path")
                     channel = res.get("channel", "UNKNOWN")
+
+                    # Attach status to job record for Google Sheets and Telegram
+                    job["Status"] = status_text
+                    job["status"] = status_text
 
                     # Update Google Sheet
                     if sheets_active and GOOGLE_CREDENTIALS_JSON:
@@ -446,19 +431,11 @@ def main():
                             contact_email=job.get("Contact Email", "")
                         )
 
-                    # Update Telegram
+                    # Update Telegram with individual application progress
                     if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
                         try:
                             tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
-                            icon = "🚀" if "Applied" in status_text else "📝"
-                            tg_msg = (
-                                f"{icon} *Auto-Apply Update:*\n"
-                                f"• *Company*: {company}\n"
-                                f"• *Role*: {title}\n"
-                                f"• *Channel*: `{channel}`\n"
-                                f"• *Status*: *{status_text}*\n"
-                                f"• *URL*: {url}"
-                            )
+                            tg_msg = tg.format_auto_apply_update(job=job, result=res)
                             tg.send_message(tg_msg)
                             if pdf_path and os.path.exists(pdf_path):
                                 tg.send_document(pdf_path, caption=f"Tailored CV for {company}")
@@ -472,6 +449,25 @@ def main():
                     print(f"[Auto-Apply] Error processing application for {company}: {apply_err}", file=sys.stderr)
         elif new_jobs and not AUTO_APPLY_ENABLED:
             print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/application.")
+
+        # --- 3. Route findings to Telegram with Applied indicator ---
+        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+            print("\nDispatching alerts to Telegram...")
+            try:
+                telegram_router = TelegramRouter(
+                    bot_token=TELEGRAM_BOT_TOKEN,
+                    chat_id=TELEGRAM_CHAT_ID
+                )
+                formatted_msg = telegram_router.format_jobs_message(new_jobs)
+                telegram_success = telegram_router.send_message(formatted_msg)
+                if telegram_success:
+                    print("Telegram notification dispatched successfully.")
+                else:
+                    print("Telegram notification dispatch failed.")
+            except Exception as e:
+                print(f"[ERROR] Exception during Telegram routing: {e}", file=sys.stderr)
+        else:
+            print("\nTelegram Bot Token/Chat ID not set. Skipping Telegram routing.")
 
         print("\n=== Pipeline finished ===")
 

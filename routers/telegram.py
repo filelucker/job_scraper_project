@@ -1,30 +1,33 @@
+import os
+import re
 import requests
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 class TelegramRouter:
-    """Router to format and send job alerts to a Telegram chat/channel."""
-    
+    """Router to format and send job alerts and application updates to Telegram."""
+
     def __init__(self, bot_token: str, chat_id: str):
         self.bot_token = bot_token
         self.chat_id = chat_id
 
-    def escape_markdown(self, text: str) -> str:
+    @staticmethod
+    def escape_markdown(text: str) -> str:
         """
-        Escapes reserved characters for Telegram's MarkdownV2.
-        For standard Markdown, escaping is simpler. Let's escape characters 
-        to ensure standard Markdown doesn't fail.
+        Escapes reserved characters for Telegram standard Markdown:
+        asterisk (*), underscore (_), brackets ([ ]), and backticks (`).
         """
         if not text:
             return ""
-        # For standard Markdown parse_mode='Markdown':
-        # Escape characters that might trigger markdown formatting incorrectly
-        reserved_chars = ['*', '_', '[', ']']
-        for char in reserved_chars:
+        text = str(text)
+        for char in ['*', '_', '[', ']', '`']:
             text = text.replace(char, f"\\{char}")
         return text
 
     def format_jobs_message(self, jobs: List[Dict[str, Any]]) -> str:
-        """Format a list of jobs into a scannable Markdown message."""
+        """
+        Format a list of jobs using the clean scannable layout
+        with an explicit 'Applied or Not' indicator.
+        """
         if not jobs:
             return "No new jobs found matching the criteria in the last 24 hours."
 
@@ -35,94 +38,58 @@ class TelegramRouter:
             location = self.escape_markdown(job.get("Location", "Unknown"))
             url = job.get("URL", "")
 
-            # Formats: *Company Name* - Title (Location)
-            # Link: [Apply Here](url)
+            # Applied or Not indicator
+            status = job.get("Status") or job.get("status")
+            if status:
+                status_str = str(status)
+                status_lower = status_str.lower()
+                if "applied" in status_lower:
+                    clean_status = re.sub(r'^(applied\s*[\(\-:]?\s*|\s*)', '', status_str, flags=re.IGNORECASE).strip(' ()')
+                    suffix = f" ({self.escape_markdown(clean_status)})" if clean_status else ""
+                    applied_str = f"✅ Applied{suffix}"
+                elif "draft" in status_lower or "review" in status_lower:
+                    clean_status = re.sub(r'^(drafted\s*[\(\-:]?\s*|\s*)', '', status_str, flags=re.IGNORECASE).strip(' ()')
+                    suffix = f" ({self.escape_markdown(clean_status)})" if clean_status else ""
+                    applied_str = f"📝 Drafted{suffix}"
+                else:
+                    applied_str = f"⏳ {self.escape_markdown(status_str)}"
+            else:
+                applied_str = "❌ Not Applied"
+
             item_str = (
                 f"{idx}. *{company}*\n"
                 f"   • *Role*: {title}\n"
                 f"   • *Location*: {location}\n"
+                f"   • *Applied*: {applied_str}\n"
                 f"   • [Apply Here]({url})\n"
             )
             lines.append(item_str)
-            
+
         return "\n".join(lines)
 
-    def send_message(self, message: str) -> bool:
-        """Send formatted message to Telegram API with intelligent line-boundary splitting."""
-        if not self.bot_token or not self.chat_id:
-            print("[Telegram Router] Missing bot token or chat ID. Skipping notification.")
-            return False
+    def format_auto_apply_update(self, job: Dict[str, Any], result: Dict[str, Any]) -> str:
+        """
+        Concise individual auto-apply update with Applied/Not indicator.
+        """
+        company = self.escape_markdown(job.get("Company", "Company"))
+        title = self.escape_markdown(job.get("Title", "Job"))
+        url = job.get("URL", "")
+        channel = result.get("channel", "UNKNOWN")
+        status_text = result.get("status", "Processed")
 
-        url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-        
-        # Telegram max length for sendMessage is 4096 characters.
-        # Split message gracefully along line breaks to preserve Markdown formatting tags.
-        max_length = 3800
-        message_chunks = []
-        
-        if len(message) <= max_length:
-            message_chunks.append(message)
-        else:
-            current_chunk = []
-            current_length = 0
-            for line in message.split("\n"):
-                line_len = len(line) + 1
-                if current_length + line_len > max_length and current_chunk:
-                    message_chunks.append("\n".join(current_chunk))
-                    current_chunk = [line]
-                    current_length = line_len
-                else:
-                    current_chunk.append(line)
-                    current_length += line_len
-            if current_chunk:
-                message_chunks.append("\n".join(current_chunk))
-        
-        success = True
-        for chunk in message_chunks:
-            payload = {
-                "chat_id": self.chat_id,
-                "text": chunk,
-                "parse_mode": "Markdown",
-                "disable_web_page_preview": True
-            }
-            try:
-                response = requests.post(url, json=payload, timeout=15)
-                response.raise_for_status()
-            except requests.RequestException as e:
-                # Try fallback as plain text if markdown formatting caused an error
-                try:
-                    payload_plain = {
-                        "chat_id": self.chat_id,
-                        "text": chunk,
-                        "disable_web_page_preview": True
-                    }
-                    response = requests.post(url, json=payload_plain, timeout=15)
-                    response.raise_for_status()
-                except requests.RequestException as e_inner:
-                    print(f"[Telegram Router] Sending failed: {e_inner}")
-                    success = False
-        return success
+        is_applied = "applied" in str(status_text).lower()
+        icon = "🚀" if is_applied else "📝"
+        applied_str = "✅ Applied" if is_applied else "❌ Not Applied"
 
-    def send_document(self, file_path: str, caption: str = "") -> bool:
-        """Send a local file as a document via Telegram API."""
-        if not self.bot_token or not self.chat_id:
-            print("[Telegram Router] Missing bot token or chat ID. Skipping document upload.")
-            return False
-
-        url = f"https://api.telegram.org/bot{self.bot_token}/sendDocument"
-        try:
-            with open(file_path, "rb") as f:
-                files = {"document": f}
-                data = {
-                    "chat_id": self.chat_id,
-                    "caption": caption[:1024]  # Telegram limits caption to 1024 chars
-                }
-                response = requests.post(url, data=data, files=files, timeout=30)
-                response.raise_for_status()
-                return True
-        except Exception as e:
-            print(f"[Telegram Router] Failed to send document: {e}")
-            return False
+        return (
+            f"{icon} *Auto-Apply Update:*\n"
+            f"• *Company*: {company}\n"
+            f"• *Role*: {title}\n"
+            f"• *Applied*: {applied_str}\n"
+            f"• *Channel*: `{channel}`\n"
+            f"• *Status*: *{status_text}*\n"
+            f"• *URL*: {url}"
+        )
 
     def format_run_summary(
         self,
@@ -134,8 +101,7 @@ class TelegramRouter:
         total_found: int,
         total_new: int
     ) -> str:
-        """Format a run execution summary for Telegram."""
-        # Format duration
+        """Format execution run summary for Telegram."""
         if duration_seconds < 60:
             duration_str = f"{int(duration_seconds)}s"
         else:
@@ -158,7 +124,6 @@ class TelegramRouter:
             lines.append("\n❌ *Failed Boards:*")
             for company_name, err in failed_boards:
                 esc_company = self.escape_markdown(company_name)
-                # Keep error message brief to avoid overflowing telegram message
                 err_str = str(err)
                 if len(err_str) > 60:
                     err_str = err_str[:57] + "..."
@@ -167,12 +132,64 @@ class TelegramRouter:
 
         return "\n".join(lines)
 
+    def send_message(self, message: str) -> bool:
+        """Send formatted message to Telegram API with line-boundary splitting."""
+        if not self.bot_token or not self.chat_id:
+            print("[Telegram Router] Missing bot token or chat ID. Skipping notification.")
+            return False
+
+        url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+        max_length = 3800
+        message_chunks = []
+
+        if len(message) <= max_length:
+            message_chunks.append(message)
+        else:
+            current_chunk = []
+            current_length = 0
+            for line in message.split("\n"):
+                line_len = len(line) + 1
+                if current_length + line_len > max_length and current_chunk:
+                    message_chunks.append("\n".join(current_chunk))
+                    current_chunk = [line]
+                    current_length = line_len
+                else:
+                    current_chunk.append(line)
+                    current_length += line_len
+            if current_chunk:
+                message_chunks.append("\n".join(current_chunk))
+
+        success = True
+        for chunk in message_chunks:
+            payload = {
+                "chat_id": self.chat_id,
+                "text": chunk,
+                "parse_mode": "Markdown",
+                "disable_web_page_preview": True
+            }
+            try:
+                response = requests.post(url, json=payload, timeout=20)
+                response.raise_for_status()
+            except requests.RequestException:
+                # Fallback to plain text if markdown formatting encountered an unescaped symbol
+                try:
+                    payload_plain = {
+                        "chat_id": self.chat_id,
+                        "text": chunk,
+                        "disable_web_page_preview": True
+                    }
+                    response = requests.post(url, json=payload_plain, timeout=20)
+                    response.raise_for_status()
+                except requests.RequestException as e_inner:
+                    print(f"[Telegram Router] Sending failed: {e_inner}")
+                    success = False
+        return success
+
     def send_document(self, document_path: str, caption: str = "") -> bool:
-        """Send a document file (such as a PDF resume) to Telegram chat."""
+        """Send a local document (e.g. PDF resume or screenshot) to Telegram chat."""
         if not self.bot_token or not self.chat_id:
             return False
-            
-        import os
+
         if not os.path.exists(document_path):
             print(f"[Telegram Router] Document not found at {document_path}")
             return False
@@ -194,5 +211,3 @@ class TelegramRouter:
         except Exception as e:
             print(f"[Telegram Router] Error sending document: {e}")
             return False
-
-
