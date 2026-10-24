@@ -6,6 +6,7 @@ from services.compiler import LatexCompiler
 from services.apply_greenhouse import GreenhouseApplier
 from services.apply_lever import LeverApplier
 from services.apply_browser import PlaywrightBrowserApplier
+from services.url_resolver import UrlResolver
 from routers.email_router import EmailRouter
 
 class AutoApplyDispatcher:
@@ -25,6 +26,9 @@ class AutoApplyDispatcher:
         self.greenhouse_applier = GreenhouseApplier(dry_run=self.dry_run)
         self.lever_applier = LeverApplier(dry_run=self.dry_run)
         self.browser_applier = PlaywrightBrowserApplier(dry_run=self.dry_run)
+        if hasattr(self.browser_applier, "form_agent") and self.browser_applier.form_agent:
+            self.browser_applier.form_agent.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
+            self.browser_applier.form_agent.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
 
         smtp = smtp_config or {}
         self.email_router = EmailRouter(
@@ -36,9 +40,9 @@ class AutoApplyDispatcher:
             dry_run=self.dry_run
         )
 
-    def detect_channel(self, job: Dict[str, Any]) -> str:
+    def detect_channel(self, job: Dict[str, Any], target_url: Optional[str] = None) -> str:
         """Identify the best application channel for a job."""
-        url = (job.get("URL") or "").lower()
+        url = (target_url or job.get("URL") or "").lower()
 
         if job.get("Contact Email"):
             return "EMAIL"
@@ -54,10 +58,17 @@ class AutoApplyDispatcher:
         """
         company = job.get("Company", "Company")
         title = job.get("Title", "Position")
-        url = job.get("URL", "")
-        channel = self.detect_channel(job)
+        raw_url = job.get("URL", "")
+
+        # Resolve aggregator URLs to canonical ATS / direct career links
+        target_url = UrlResolver.resolve(raw_url)
+        job["Resolved_URL"] = target_url
+        channel = self.detect_channel(job, target_url=target_url)
 
         print(f"\n[AutoApplyDispatcher] Processing application for: {company} - {title}")
+        print(f"  • Raw URL: {raw_url}")
+        if target_url != raw_url:
+            print(f"  • Canonical Resolved URL: {target_url}")
         print(f"  • Channel: {channel} | Mode: {self.mode}")
 
         # 1. AI Tailoring
@@ -84,7 +95,7 @@ class AutoApplyDispatcher:
         result = {}
         if channel == "GREENHOUSE":
             res = self.greenhouse_applier.apply(
-                job_url=url,
+                job_url=target_url,
                 pdf_path=pdf_path,
                 cover_letter=tailored.get("email_body_text")
             )
@@ -98,7 +109,7 @@ class AutoApplyDispatcher:
 
         elif channel == "LEVER":
             res = self.lever_applier.apply(
-                job_url=url,
+                job_url=target_url,
                 pdf_path=pdf_path,
                 comments=tailored.get("email_body_text")
             )
@@ -130,7 +141,7 @@ class AutoApplyDispatcher:
 
         else:  # BROWSER / WEB_PORTAL
             res = self.browser_applier.apply(
-                job_url=url,
+                job_url=target_url,
                 pdf_path=pdf_path,
                 mode=self.mode
             )
