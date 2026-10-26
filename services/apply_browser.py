@@ -13,13 +13,15 @@ except ImportError:
 from services.profile_loader import get_candidate_profile
 from services.url_resolver import UrlResolver
 from services.form_agent import FormAgent
+from services.captcha_solver import CaptchaSolver
 
 class PlaywrightBrowserApplier:
     """
     Automates job application form filling and submission using Playwright with:
     1. Stealth anti-bot evasion & Cloudflare Turnstile detection/handling
-    2. URL canonicalization resolving aggregators (Arbeitnow, Jooble, etc.)
-    3. AI-powered dynamic form inspection and field filling
+    2. Automated CAPTCHA solving (reCAPTCHA v2/v3, hCaptcha, Turnstile)
+    3. URL canonicalization resolving aggregators (Arbeitnow, Jooble, etc.)
+    4. AI-powered dynamic form inspection, field filling, and auto-submission
     """
 
     def __init__(self, dry_run: bool = True, headless: bool = True):
@@ -27,6 +29,7 @@ class PlaywrightBrowserApplier:
         self.headless = headless
         self.profile = get_candidate_profile()
         self.form_agent = FormAgent()
+        self.captcha_solver = CaptchaSolver()
 
     def _inject_stealth_scripts(self, page):
         """Injects anti-detection scripts to mask automation flags."""
@@ -171,8 +174,9 @@ class PlaywrightBrowserApplier:
                 page.goto(target_url, wait_until="domcontentloaded")
                 time.sleep(random.uniform(1.5, 3.0))
 
-                # Step 2: Handle Cloudflare Turnstile if encountered
+                # Step 2: Handle Bot Detection & CAPTCHAs (Turnstile, reCAPTCHA, hCaptcha)
                 self._handle_cloudflare_turnstile(page)
+                self.captcha_solver.solve_if_present(page)
 
                 # Look for an initial 'Apply' / 'Apply Now' trigger button if on a job detail page
                 apply_triggers = [
@@ -194,6 +198,8 @@ class PlaywrightBrowserApplier:
                             if len(btn_text) < 30:
                                 btn.click()
                                 time.sleep(random.uniform(1.5, 2.5))
+                                # Re-check for CAPTCHA if clicking Apply loaded a challenge modal
+                                self.captcha_solver.solve_if_present(page)
                                 break
                     except Exception:
                         pass
@@ -203,6 +209,9 @@ class PlaywrightBrowserApplier:
                 print(f"[BrowserApplier] Found {len(controls)} interactive form control(s) on the page.")
 
                 answers = self.form_agent.answer_fields(controls, candidate)
+
+                # Ensure any CAPTCHA challenge on the form is solved before submission
+                self.captcha_solver.solve_if_present(page)
 
                 # Determine if auto submission should occur
                 is_simulation = (mode in ("review", "dry_run") or self.dry_run)

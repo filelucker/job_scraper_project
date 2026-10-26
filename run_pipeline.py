@@ -436,12 +436,22 @@ def main():
                         try:
                             tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
                             tg_msg = tg.format_auto_apply_update(job=job, result=res)
-                            tg.send_message(tg_msg)
-                            if pdf_path and os.path.exists(pdf_path):
-                                tg.send_document(pdf_path, caption=f"Tailored CV for {company}")
                             screenshot = res.get("screenshot_path")
+                            pdf_path = res.get("pdf_path")
+
+                            # Send screenshot as an inline preview image with the card as its caption
+                            screenshot_sent = False
                             if screenshot and os.path.exists(screenshot):
-                                tg.send_document(screenshot, caption=f"Form Screenshot for {company}")
+                                screenshot_sent = tg.send_photo(screenshot, caption=tg_msg)
+
+                            # If no screenshot or photo send failed, send as text card
+                            if not screenshot_sent:
+                                tg.send_message(tg_msg)
+
+                            # Attach tailored CV PDF
+                            if pdf_path and os.path.exists(pdf_path):
+                                tg.send_document(pdf_path, caption=f"📄 Tailored CV for {company}")
+
                         except Exception as tg_err:
                             print(f"[Auto-Apply] Failed sending Telegram update: {tg_err}")
 
@@ -450,22 +460,25 @@ def main():
         elif new_jobs and not AUTO_APPLY_ENABLED:
             print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/application.")
 
-        # --- 3. Route findings to Telegram with Applied indicator ---
+        # --- 3. Route findings to Telegram (only if auto-apply did not run, to prevent duplicate spam) ---
         if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-            print("\nDispatching alerts to Telegram...")
-            try:
-                telegram_router = TelegramRouter(
-                    bot_token=TELEGRAM_BOT_TOKEN,
-                    chat_id=TELEGRAM_CHAT_ID
-                )
-                formatted_msg = telegram_router.format_jobs_message(new_jobs)
-                telegram_success = telegram_router.send_message(formatted_msg)
-                if telegram_success:
-                    print("Telegram notification dispatched successfully.")
-                else:
-                    print("Telegram notification dispatch failed.")
-            except Exception as e:
-                print(f"[ERROR] Exception during Telegram routing: {e}", file=sys.stderr)
+            if not AUTO_APPLY_ENABLED and new_jobs:
+                print("\nDispatching alerts to Telegram...")
+                try:
+                    telegram_router = TelegramRouter(
+                        bot_token=TELEGRAM_BOT_TOKEN,
+                        chat_id=TELEGRAM_CHAT_ID
+                    )
+                    formatted_msg = telegram_router.format_jobs_message(new_jobs, lookback_hours=JOB_LOOKBACK_HOURS)
+                    telegram_success = telegram_router.send_message(formatted_msg)
+                    if telegram_success:
+                        print("Telegram notification dispatched successfully.")
+                    else:
+                        print("Telegram notification dispatch failed.")
+                except Exception as e:
+                    print(f"[ERROR] Exception during Telegram routing: {e}", file=sys.stderr)
+            elif new_jobs and AUTO_APPLY_ENABLED:
+                print(f"\nAll {len(new_jobs)} job(s) notified individually via auto-apply cards. Skipping duplicate batch list.")
         else:
             print("\nTelegram Bot Token/Chat ID not set. Skipping Telegram routing.")
 

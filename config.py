@@ -15,7 +15,10 @@ KEYWORDS = [
     "iOS",
     "Dart",
     # "Java",
-    "Kotlin",
+    # "Kotlin",
+    "Kotlin Developer",
+    "Kotlin Mobile",
+    "Android Kotlin",
     "Flutter/Android/iOS/Dart",
     "Flutter Developer",
     "Flutter Engineer",
@@ -94,7 +97,7 @@ COMPOUND_RULES = [
 ]
 
 # Time limit in hours for jobs posted
-JOB_LOOKBACK_HOURS = 24
+JOB_LOOKBACK_HOURS = int(os.getenv("JOB_LOOKBACK_HOURS", "6"))
 
 # Location filtering: If True, only jobs matching 'remote' or 'hybrid' in location/title are processed
 ONLY_REMOTE_OR_HYBRID = True
@@ -1279,7 +1282,6 @@ COMPANY_BOARDS = {
     'Y Combinator': {'ats': 'ycombinator', 'token': '*'},
     'Adzuna': {'ats': 'adzuna', 'token': '*'},
     'Jooble': {'ats': 'jooble', 'token': '*'},
-    'Otta': {'ats': 'welcometothejungle', 'token': '*'},
     'FlexJobs': {'ats': 'flexjobs', 'token': '*'},
     'LinkedIn': {'ats': 'linkedin', 'token': '*'},
     'Indeed': {'ats': 'indeed', 'token': '*'},

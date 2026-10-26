@@ -23,15 +23,18 @@ class TelegramRouter:
             text = text.replace(char, f"\\{char}")
         return text
 
-    def format_jobs_message(self, jobs: List[Dict[str, Any]]) -> str:
+    def format_jobs_message(self, jobs: List[Dict[str, Any]], lookback_hours: int = 6) -> str:
         """
         Format a list of jobs using the clean scannable layout
-        with an explicit 'Applied or Not' indicator.
+        with an explicit status indicator.
         """
         if not jobs:
-            return "No new jobs found matching the criteria in the last 24 hours."
+            return (
+                "✨ *All Caught Up!*\n"
+                f"🔍 No new jobs matched your tracking criteria in the last {lookback_hours} hours."
+            )
 
-        lines = ["*🔔 New Job Postings Found (Last 24 Hours) *\n"]
+        lines = [f"🔔 *New Job Postings Found (Last {lookback_hours} Hours)*\n"]
         for idx, job in enumerate(jobs, 1):
             company = self.escape_markdown(job.get("Company", "Unknown"))
             title = self.escape_markdown(job.get("Title", "Unknown"))
@@ -60,8 +63,8 @@ class TelegramRouter:
                 f"{idx}. *{company}*\n"
                 f"   • *Role*: {title}\n"
                 f"   • *Location*: {location}\n"
-                f"   • *Applied*: {applied_str}\n"
-                f"   • [Apply Here]({url})\n"
+                f"   • *Status*: {applied_str}\n"
+                f"   • 🔗 [Open Job Posting]({url})\n"
             )
             lines.append(item_str)
 
@@ -69,27 +72,46 @@ class TelegramRouter:
 
     def format_auto_apply_update(self, job: Dict[str, Any], result: Dict[str, Any]) -> str:
         """
-        Concise individual auto-apply update with Applied/Not indicator.
+        Refined individual auto-apply update card with clear status and direct link.
         """
         company = self.escape_markdown(job.get("Company", "Company"))
         title = self.escape_markdown(job.get("Title", "Job"))
+        location = self.escape_markdown(job.get("Location", "Remote"))
         url = job.get("URL", "")
-        channel = result.get("channel", "UNKNOWN")
+        channel = str(result.get("channel", "BROWSER")).upper()
         status_text = result.get("status", "Processed")
+        status_lower = str(status_text).lower()
 
-        is_applied = "applied" in str(status_text).lower()
-        icon = "🚀" if is_applied else "📝"
-        applied_str = "✅ Applied" if is_applied else "❌ Not Applied"
+        if "applied" in status_lower:
+            header = "🚀 *Application Submitted*"
+            status_line = f"• *Status*: ✅ Applied ({self.escape_markdown(str(status_text))})"
+        elif "draft" in status_lower or "review" in status_lower:
+            header = "📝 *Application Drafted (Pre-Filled)*"
+            status_line = "• *Status*: 📝 Form Pre-filled (Ready for Review)"
+        else:
+            header = "ℹ️ *Application Update*"
+            status_line = f"• *Status*: ⏳ {self.escape_markdown(str(status_text))}"
 
-        return (
-            f"{icon} *Auto-Apply Update:*\n"
-            f"• *Company*: {company}\n"
-            f"• *Role*: {title}\n"
-            f"• *Applied*: {applied_str}\n"
-            f"• *Channel*: `{channel}`\n"
-            f"• *Status*: *{status_text}*\n"
-            f"• *URL*: {url}"
-        )
+        channel_map = {
+            "GREENHOUSE": "Greenhouse Direct",
+            "LEVER": "Lever Direct",
+            "EMAIL": "Direct Email",
+            "BROWSER": "Browser Form Automation"
+        }
+        channel_name = channel_map.get(channel, channel)
+
+        lines = [
+            header,
+            f"• *Company*: *{company}*",
+            f"• *Role*: {title}",
+            f"• *Location*: {location}",
+            status_line,
+            f"• *Channel*: `{channel_name}`"
+        ]
+        if url:
+            lines.append(f"• 🔗 [Open Job Application]({url})")
+
+        return "\n".join(lines)
 
     def format_run_summary(
         self,
@@ -211,3 +233,41 @@ class TelegramRouter:
         except Exception as e:
             print(f"[Telegram Router] Error sending document: {e}")
             return False
+
+    def send_photo(self, photo_path: str, caption: str = "") -> bool:
+        """Send a photo to Telegram chat so it previews inline with an optional formatted caption."""
+        if not self.bot_token or not self.chat_id:
+            return False
+
+        if not os.path.exists(photo_path):
+            print(f"[Telegram Router] Photo not found at {photo_path}")
+            return False
+
+        url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+        try:
+            with open(photo_path, "rb") as f:
+                files = {"photo": f}
+                data = {
+                    "chat_id": self.chat_id,
+                    "caption": caption[:1024],
+                    "parse_mode": "Markdown"
+                }
+                resp = requests.post(url, data=data, files=files, timeout=45)
+                if resp.status_code == 200:
+                    return True
+                else:
+                    # Retry without Markdown parsing if caption has special markdown characters
+                    f.seek(0)
+                    data_plain = {
+                        "chat_id": self.chat_id,
+                        "caption": caption[:1024]
+                    }
+                    resp_retry = requests.post(url, data=data_plain, files=files, timeout=45)
+                    if resp_retry.status_code == 200:
+                        return True
+                    print(f"[Telegram Router] Failed to send photo: {resp_retry.text}")
+                    return False
+        except Exception as e:
+            print(f"[Telegram Router] Error sending photo: {e}")
+            return False
+
