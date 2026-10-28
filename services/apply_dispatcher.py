@@ -86,9 +86,11 @@ class AutoApplyDispatcher:
         )
         compile_ok = self.compiler.compile_pdf(rendered_latex, pdf_path)
         if not compile_ok or not os.path.exists(pdf_path):
-            print(f"[AutoApplyDispatcher] PDF compilation failed for {company}. Falling back to master resume.")
-            pdf_path = "master_resume.pdf"
-            if not os.path.exists(pdf_path):
+            print(f"[AutoApplyDispatcher] Custom PDF compilation unavailable or failed for {company}. Falling back to master resume.")
+            master_pdf = os.path.abspath("master_resume.pdf")
+            if os.path.exists(master_pdf):
+                pdf_path = master_pdf
+            elif self.compiler.tectonic_bin:
                 self.compiler.compile_pdf(self.compiler.render_latex(), pdf_path)
 
         # 3. Route to specific channel
@@ -145,11 +147,20 @@ class AutoApplyDispatcher:
                 pdf_path=pdf_path,
                 mode=self.mode
             )
+            is_success = res.get("success", False)
+            if is_success and self.mode == "auto":
+                status = "Applied (Web Portal)"
+            elif is_success or res.get("filled_fields_count", 0) > 0:
+                status = "Drafted (Web Form Filled)"
+            else:
+                err = res.get("error")
+                status = f"Apply via URL ({err})" if err else "Apply via URL"
+
             result = {
                 "channel": channel,
-                "success": res.get("success", False),
+                "success": is_success,
                 "pdf_path": pdf_path,
-                "status": "Applied (Web Portal)" if (res.get("success") and self.mode == "auto") else "Drafted (Web Form Filled)",
+                "status": status,
                 "screenshot_path": res.get("screenshot_path"),
                 "details": res
             }

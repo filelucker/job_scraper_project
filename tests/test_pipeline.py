@@ -301,7 +301,21 @@ class TestPipeline(unittest.TestCase):
         self.assertIn("*Skipped*: 2", summary)
         self.assertIn("*Jobs Matched*: 5", summary)
         self.assertIn("*New Jobs Added*: 2", summary)
+        self.assertIn("*Jobs Applied*: 0", summary)
         self.assertNotIn("Failed Boards:", summary)
+
+        # Test with explicit applied count
+        summary_applied = router.format_run_summary(
+            duration_seconds=10.0,
+            total_configured=2,
+            scanned_count=2,
+            skipped_count=0,
+            failed_boards=[],
+            total_found=2,
+            total_new=2,
+            total_applied=2
+        )
+        self.assertIn("*Jobs Applied*: 2", summary_applied)
 
         # Test summary format with failures (no truncation)
         summary_with_fail = router.format_run_summary(

@@ -80,6 +80,34 @@ class GoogleSheetsRouter:
             print(f"[Google Sheets Router] Error fetching existing URLs: {e}")
             return []
 
+    def get_unapplied_jobs(self) -> List[Dict[str, Any]]:
+        """Fetch all rows where Application Status is 'Apply via URL' or 'Pending' and Applied At is empty."""
+        if not self.credentials_json:
+            return []
+        try:
+            worksheet = self._get_worksheet()
+            if not worksheet:
+                return []
+            records = worksheet.get_all_records()
+            unapplied = []
+            for row in records:
+                status = str(row.get("Application Status", "")).strip()
+                applied_at = str(row.get("Applied At", "")).strip()
+                if ("Apply via" in status or "Pending" in status) and not applied_at:
+                    unapplied.append({
+                        "Company": row.get("Company", ""),
+                        "Title": row.get("Title", ""),
+                        "Location": row.get("Location", ""),
+                        "URL": row.get("URL", ""),
+                        "Contact Email": row.get("Contact Email", ""),
+                        "Application Status": status,
+                        "Applied At": applied_at
+                    })
+            return unapplied
+        except Exception as e:
+            print(f"[Google Sheets Router] Error fetching unapplied jobs: {e}")
+            return []
+
     def _convert_to_am_pm(self, time_str: str) -> str:
         """Convert a 24-hour time string like '2026-07-12 21:33:01 BST' to 12-hour AM/PM format '2026-07-12 09:33:01 PM BST'."""
         if not time_str:
@@ -128,8 +156,10 @@ class GoogleSheetsRouter:
                 worldwide_val = "Yes" if is_worldwide else "No"
                 
                 contact_email = job.get("Contact Email") or job.get("email", "")
-                status = job.get("Application Status") or job.get("initial_status", "Pending")
-                applied_at = job.get("Applied At", "")
+                status = job.get("Application Status") or job.get("Status") or job.get("status") or job.get("initial_status", "Pending")
+                applied_at = job.get("Applied At") or job.get("applied_at") or ""
+                if not applied_at and ("Applied" in status or "Drafted" in status):
+                    applied_at = self._current_bst_timestamp()
 
                 rows_to_append.append([
                     job.get("Company", ""),
@@ -173,8 +203,10 @@ class GoogleSheetsRouter:
             if not worksheet:
                 return False
 
-            # Find cell matching URL
-            cell = worksheet.find(job_url)
+            # Find cell matching URL in Column 4 (D) first, with fallback to full sheet
+            cell = worksheet.find(job_url, in_column=4)
+            if not cell:
+                cell = worksheet.find(job_url)
             if not cell:
                 print(f"[Google Sheets Router] URL not found for status update: {job_url}")
                 return False

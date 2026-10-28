@@ -362,7 +362,100 @@ def main():
                 if job["Contact Email"]:
                     print(f"  • {job.get('Company')} -> Application Email found: {job['Contact Email']}")
 
-        # --- 1. Route findings to Google Sheets ---
+        # --- 2. Auto-Apply & Customized CV Pipeline ---
+        if new_jobs and AUTO_APPLY_ENABLED:
+            print(f"\n[Auto-Apply] Processing {len(new_jobs)} new job(s) via AutoApplyDispatcher in '{AUTO_APPLY_MODE}' mode...")
+            try:
+                dispatcher = AutoApplyDispatcher(
+                    mode=AUTO_APPLY_MODE,
+                    gemini_api_key=GEMINI_API_KEY,
+                    openai_api_key=OPENAI_API_KEY,
+                    smtp_config={
+                        "host": SMTP_HOST,
+                        "port": SMTP_PORT,
+                        "user": SMTP_USER,
+                        "password": SMTP_PASSWORD,
+                        "sender_name": SENDER_NAME
+                    }
+                )
+            except Exception as init_err:
+                print(f"[Auto-Apply] Error initializing dispatcher: {init_err}", file=sys.stderr)
+                dispatcher = None
+
+            if dispatcher:
+                bst_tz = timezone(timedelta(hours=6))
+                for job in new_jobs:
+                    company = job.get("Company", "Company")
+                    title = job.get("Title", "Job")
+                    url = job.get("URL", "")
+
+                    try:
+                        res = dispatcher.process_job(job)
+                        status_text = res.get("status", "Processed")
+                        pdf_path = res.get("pdf_path")
+                        channel = res.get("channel", "UNKNOWN")
+                        timestamp = datetime.now(bst_tz).strftime("%Y-%m-%d %I:%M:%S %p BST")
+
+                        # Attach status and timestamp to job record for Google Sheets and Telegram
+                        job["Status"] = status_text
+                        job["status"] = status_text
+                        job["Application Status"] = status_text
+                        job["Applied At"] = timestamp
+
+                        # Update Telegram with individual application progress
+                        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+                            try:
+                                tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+                                tg_msg = tg.format_auto_apply_update(job=job, result=res)
+                                screenshot = res.get("screenshot_path")
+
+                                # Send screenshot as an inline preview image with the card as its caption
+                                screenshot_sent = False
+                                if screenshot and os.path.exists(screenshot):
+                                    screenshot_sent = tg.send_photo(screenshot, caption=tg_msg)
+
+                                # If no screenshot or photo send failed, send as text card
+                                if not screenshot_sent:
+                                    tg.send_message(tg_msg)
+
+                                # Attach tailored CV PDF
+                                if pdf_path and os.path.exists(pdf_path):
+                                    tg.send_document(pdf_path, caption=f"📄 Tailored CV for {company}")
+
+                            except Exception as tg_err:
+                                print(f"[Auto-Apply] Failed sending Telegram update: {tg_err}")
+
+                    except Exception as apply_err:
+                        print(f"[Auto-Apply] Error processing application for {company}: {apply_err}", file=sys.stderr)
+        elif new_jobs and not AUTO_APPLY_ENABLED:
+            print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/application.")
+
+        # --- 3. Optional: Reprocess existing unapplied jobs in Google Sheets ---
+        if sheets_active and GOOGLE_CREDENTIALS_JSON and AUTO_APPLY_ENABLED and os.getenv("AUTO_APPLY_REPROCESS_UNAPPLIED", "false").lower() in ("true", "1"):
+            print("\n[Auto-Apply] Checking for unapplied 'Apply via URL' rows in Google Sheets to re-process...")
+            try:
+                unapplied_jobs = sheets_router.get_unapplied_jobs()
+                if unapplied_jobs:
+                    print(f"[Auto-Apply] Found {len(unapplied_jobs)} unapplied job(s) in sheet. Processing...")
+                    if not dispatcher:
+                        dispatcher = AutoApplyDispatcher(mode=AUTO_APPLY_MODE)
+                    for ujob in unapplied_jobs:
+                        u_url = ujob.get("URL", "")
+                        u_company = ujob.get("Company", "Company")
+                        try:
+                            res = dispatcher.process_job(ujob)
+                            u_status = res.get("status", "Applied (Web Portal)")
+                            sheets_router.update_application_status(
+                                job_url=u_url,
+                                status=u_status,
+                                contact_email=ujob.get("Contact Email", "")
+                            )
+                        except Exception as e:
+                            print(f"[Auto-Apply] Failed reprocessing sheet job {u_company}: {e}")
+            except Exception as e:
+                print(f"[Auto-Apply] Error checking unapplied jobs in sheet: {e}")
+
+        # --- 4. Route findings to Google Sheets (Bulk append with final status & dates) ---
         if new_jobs and GOOGLE_CREDENTIALS_JSON and sheets_active:
             print("\nExporting new matches to Google Sheets...")
             try:
@@ -391,74 +484,6 @@ def main():
                 print(f"Updated local state cache in '{local_state_file}'.")
             except Exception as e:
                 print(f"[Warning] Failed to write local state file '{local_state_file}': {e}", file=sys.stderr)
-
-        # --- 2. Auto-Apply & Customized CV Pipeline ---
-        if new_jobs and AUTO_APPLY_ENABLED:
-            print(f"\n[Auto-Apply] Processing {len(new_jobs)} new job(s) via AutoApplyDispatcher in '{AUTO_APPLY_MODE}' mode...")
-            dispatcher = AutoApplyDispatcher(
-                mode=AUTO_APPLY_MODE,
-                gemini_api_key=GEMINI_API_KEY,
-                openai_api_key=OPENAI_API_KEY,
-                smtp_config={
-                    "host": SMTP_HOST,
-                    "port": SMTP_PORT,
-                    "user": SMTP_USER,
-                    "password": SMTP_PASSWORD,
-                    "sender_name": SENDER_NAME
-                }
-            )
-
-            for job in new_jobs:
-                company = job.get("Company", "Company")
-                title = job.get("Title", "Job")
-                url = job.get("URL", "")
-
-                try:
-                    res = dispatcher.process_job(job)
-                    status_text = res.get("status", "Processed")
-                    pdf_path = res.get("pdf_path")
-                    channel = res.get("channel", "UNKNOWN")
-
-                    # Attach status to job record for Google Sheets and Telegram
-                    job["Status"] = status_text
-                    job["status"] = status_text
-
-                    # Update Google Sheet
-                    if sheets_active and GOOGLE_CREDENTIALS_JSON:
-                        sheets_router.update_application_status(
-                            job_url=url,
-                            status=status_text,
-                            contact_email=job.get("Contact Email", "")
-                        )
-
-                    # Update Telegram with individual application progress
-                    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-                        try:
-                            tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
-                            tg_msg = tg.format_auto_apply_update(job=job, result=res)
-                            screenshot = res.get("screenshot_path")
-                            pdf_path = res.get("pdf_path")
-
-                            # Send screenshot as an inline preview image with the card as its caption
-                            screenshot_sent = False
-                            if screenshot and os.path.exists(screenshot):
-                                screenshot_sent = tg.send_photo(screenshot, caption=tg_msg)
-
-                            # If no screenshot or photo send failed, send as text card
-                            if not screenshot_sent:
-                                tg.send_message(tg_msg)
-
-                            # Attach tailored CV PDF
-                            if pdf_path and os.path.exists(pdf_path):
-                                tg.send_document(pdf_path, caption=f"📄 Tailored CV for {company}")
-
-                        except Exception as tg_err:
-                            print(f"[Auto-Apply] Failed sending Telegram update: {tg_err}")
-
-                except Exception as apply_err:
-                    print(f"[Auto-Apply] Error processing application for {company}: {apply_err}", file=sys.stderr)
-        elif new_jobs and not AUTO_APPLY_ENABLED:
-            print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/application.")
 
         # --- 3. Route findings to Telegram (only if auto-apply did not run, to prevent duplicate spam) ---
         if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
@@ -511,6 +536,11 @@ def main():
                     bot_token=TELEGRAM_BOT_TOKEN,
                     chat_id=TELEGRAM_CHAT_ID
                 )
+                total_applied = sum(
+                    1 for j in new_jobs
+                    if "applied" in str(j.get("Application Status", "") or j.get("Status", "")).lower()
+                ) if 'new_jobs' in locals() and new_jobs else 0
+
                 summary_msg = telegram_router.format_run_summary(
                     duration_seconds=duration_seconds,
                     total_configured=len(COMPANY_BOARDS),
@@ -518,7 +548,8 @@ def main():
                     skipped_count=len(skipped_boards),
                     failed_boards=failed_boards,
                     total_found=len(all_matched_jobs),
-                    total_new=len(new_jobs)
+                    total_new=len(new_jobs),
+                    total_applied=total_applied
                 )
                 telegram_router.send_message(summary_msg)
             except Exception as tg_err:

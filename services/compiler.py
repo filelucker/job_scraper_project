@@ -7,14 +7,17 @@ from typing import Optional
 
 TECTONIC_FALLBACK_PATH = r"C:\Users\mzama\AppData\Local\tectonic\tectonic.exe"
 
-def get_tectonic_path() -> str:
+def get_tectonic_path() -> Optional[str]:
     """Find tectonic executable in PATH or fallback path."""
     which_path = shutil.which("tectonic")
     if which_path and os.path.exists(which_path):
         return which_path
+    user_appdata = os.path.join(os.environ.get("LOCALAPPDATA", ""), "tectonic", "tectonic.exe")
+    if os.path.exists(user_appdata):
+        return user_appdata
     if os.path.exists(TECTONIC_FALLBACK_PATH):
         return TECTONIC_FALLBACK_PATH
-    raise FileNotFoundError("Tectonic executable not found in PATH or default install directory.")
+    return None
 
 def escape_latex(text: str) -> str:
     """Safely escape text for LaTeX insertion while preserving intentional LaTeX tags."""
@@ -100,6 +103,10 @@ class LatexCompiler:
 
     def compile_pdf(self, latex_content: str, output_pdf_path: str) -> bool:
         """Compile given LaTeX content into a PDF file at output_pdf_path using Tectonic."""
+        if not self.tectonic_bin or not os.path.exists(self.tectonic_bin):
+            print("[LatexCompiler] Tectonic executable not found in PATH or install directory. Skipping custom PDF compilation.")
+            return False
+
         os.makedirs(os.path.dirname(os.path.abspath(output_pdf_path)), exist_ok=True)
         
         with tempfile.TemporaryDirectory() as temp_dir:

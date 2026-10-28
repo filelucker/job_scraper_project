@@ -121,7 +121,8 @@ class TelegramRouter:
         skipped_count: int,
         failed_boards: List[tuple],
         total_found: int,
-        total_new: int
+        total_new: int,
+        total_applied: int = 0
     ) -> str:
         """Format execution run summary for Telegram."""
         if duration_seconds < 60:
@@ -139,7 +140,8 @@ class TelegramRouter:
             f"   • *Skipped*: {skipped_count}",
             f"   • *Failed*: {len(failed_boards)}",
             f"💼 *Jobs Matched*: {total_found}",
-            f"🆕 *New Jobs Added*: {total_new}"
+            f"🆕 *New Jobs Added*: {total_new}",
+            f"✅ *Jobs Applied*: {total_applied}"
         ]
 
         if failed_boards:
