@@ -427,6 +427,9 @@ def main():
 
                     except Exception as apply_err:
                         print(f"[Auto-Apply] Error processing application for {company}: {apply_err}", file=sys.stderr)
+                        job["Status"] = f"Failed ({apply_err})"
+                        job["status"] = f"Failed ({apply_err})"
+                        job["Application Status"] = f"Failed ({apply_err})"
         elif new_jobs and not AUTO_APPLY_ENABLED:
             print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/application.")
 
@@ -536,10 +539,22 @@ def main():
                     bot_token=TELEGRAM_BOT_TOKEN,
                     chat_id=TELEGRAM_CHAT_ID
                 )
+                active_new_jobs = new_jobs if ('new_jobs' in locals() and new_jobs) else []
                 total_applied = sum(
-                    1 for j in new_jobs
+                    1 for j in active_new_jobs
                     if "applied" in str(j.get("Application Status", "") or j.get("Status", "")).lower()
-                ) if 'new_jobs' in locals() and new_jobs else 0
+                )
+                total_drafted = sum(
+                    1 for j in active_new_jobs
+                    if any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("draft", "review"))
+                )
+                failed_jobs_list = [
+                    (j.get("Company", "Unknown"), str(j.get("Application Status", "") or j.get("Status", "")))
+                    for j in active_new_jobs
+                    if any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("fail", "error"))
+                ]
+                total_failed = len(failed_jobs_list)
+                total_unapplied = max(0, len(active_new_jobs) - total_applied - total_drafted - total_failed)
 
                 summary_msg = telegram_router.format_run_summary(
                     duration_seconds=duration_seconds,
@@ -547,9 +562,13 @@ def main():
                     scanned_count=len(scanned_boards),
                     skipped_count=len(skipped_boards),
                     failed_boards=failed_boards,
-                    total_found=len(all_matched_jobs),
-                    total_new=len(new_jobs),
-                    total_applied=total_applied
+                    total_found=len(all_matched_jobs) if 'all_matched_jobs' in locals() else 0,
+                    total_new=len(active_new_jobs),
+                    total_applied=total_applied,
+                    total_drafted=total_drafted,
+                    total_unapplied=total_unapplied,
+                    total_failed=total_failed,
+                    failed_jobs=failed_jobs_list
                 )
                 telegram_router.send_message(summary_msg)
             except Exception as tg_err:

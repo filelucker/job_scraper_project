@@ -302,6 +302,8 @@ class TestPipeline(unittest.TestCase):
         self.assertIn("*Jobs Matched*: 5", summary)
         self.assertIn("*New Jobs Added*: 2", summary)
         self.assertIn("*Jobs Applied*: 0", summary)
+        self.assertIn("*Jobs Drafted*: 0", summary)
+        self.assertIn("*Jobs Unapplied*: 2", summary)
         self.assertNotIn("Failed Boards:", summary)
 
         # Test with explicit applied count
@@ -316,6 +318,46 @@ class TestPipeline(unittest.TestCase):
             total_applied=2
         )
         self.assertIn("*Jobs Applied*: 2", summary_applied)
+        self.assertIn("*Jobs Drafted*: 0", summary_applied)
+        self.assertIn("*Jobs Unapplied*: 0", summary_applied)
+
+        # Test with explicit drafted and unapplied count
+        summary_drafted = router.format_run_summary(
+            duration_seconds=15.0,
+            total_configured=5,
+            scanned_count=5,
+            skipped_count=0,
+            failed_boards=[],
+            total_found=6,
+            total_new=5,
+            total_applied=1,
+            total_drafted=3,
+            total_unapplied=1
+        )
+        self.assertIn("*Jobs Applied*: 1", summary_drafted)
+        self.assertIn("*Jobs Drafted*: 3", summary_drafted)
+        self.assertIn("*Jobs Unapplied*: 1", summary_drafted)
+
+        # Test with failed applications
+        summary_app_fail = router.format_run_summary(
+            duration_seconds=20.0,
+            total_configured=3,
+            scanned_count=3,
+            skipped_count=0,
+            failed_boards=[],
+            total_found=2,
+            total_new=2,
+            total_applied=0,
+            total_drafted=1,
+            total_failed=1,
+            failed_jobs=[("TestCorp", "CAPTCHA detected on submission")]
+        )
+        self.assertIn("*Jobs Applied*: 0", summary_app_fail)
+        self.assertIn("*Jobs Drafted*: 1", summary_app_fail)
+        self.assertIn("*Jobs Failed*: 1", summary_app_fail)
+        self.assertIn("Failed Applications:", summary_app_fail)
+        self.assertIn("TestCorp", summary_app_fail)
+        self.assertIn("CAPTCHA detected on submission", summary_app_fail)
 
         # Test summary format with failures (no truncation)
         summary_with_fail = router.format_run_summary(

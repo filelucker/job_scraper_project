@@ -122,7 +122,12 @@ class TelegramRouter:
         failed_boards: List[tuple],
         total_found: int,
         total_new: int,
-        total_applied: int = 0
+        total_applied: int = 0,
+        total_drafted: int = 0,
+        total_unapplied: Optional[int] = None,
+        total_failed: int = 0,
+        failed_jobs: Optional[List[tuple]] = None,
+        **kwargs
     ) -> str:
         """Format execution run summary for Telegram."""
         if duration_seconds < 60:
@@ -131,6 +136,12 @@ class TelegramRouter:
             minutes = int(duration_seconds // 60)
             seconds = int(duration_seconds % 60)
             duration_str = f"{minutes}m {seconds}s"
+
+        if total_failed == 0 and failed_jobs:
+            total_failed = len(failed_jobs)
+
+        if total_unapplied is None:
+            total_unapplied = max(0, total_new - total_applied - total_drafted - total_failed)
 
         lines = [
             "📋 *Job Scraper Run Summary*",
@@ -141,12 +152,27 @@ class TelegramRouter:
             f"   • *Failed*: {len(failed_boards)}",
             f"💼 *Jobs Matched*: {total_found}",
             f"🆕 *New Jobs Added*: {total_new}",
-            f"✅ *Jobs Applied*: {total_applied}"
+            f"✅ *Jobs Applied*: {total_applied}",
+            f"📝 *Jobs Drafted*: {total_drafted}",
+            f"⏳ *Jobs Unapplied*: {total_unapplied}"
         ]
+
+        if total_failed > 0:
+            lines.append(f"❌ *Jobs Failed*: {total_failed}")
 
         if failed_boards:
             lines.append("\n❌ *Failed Boards:*")
             for company_name, err in failed_boards:
+                esc_company = self.escape_markdown(company_name)
+                err_str = str(err)
+                if len(err_str) > 60:
+                    err_str = err_str[:57] + "..."
+                esc_err = self.escape_markdown(err_str)
+                lines.append(f"• *{esc_company}*: {esc_err}")
+
+        if failed_jobs:
+            lines.append("\n❌ *Failed Applications:*")
+            for company_name, err in failed_jobs:
                 esc_company = self.escape_markdown(company_name)
                 err_str = str(err)
                 if len(err_str) > 60:
