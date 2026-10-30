@@ -174,6 +174,11 @@ def fetch_board(company_name: str, board_config: dict):
         return company_name, [], "skipped", None
 
 
+    # Skip scrapers known to be blocked by cloud anti-bot/WAFs or rate limits to prevent hangs and log spam
+    if ats_type in ("jobsch", "flexjobs", "programathor", "wanted", "jobs_cz") and not os.getenv("ENABLE_UNSTABLE_AGGREGATORS"):
+        print(f"[{company_name}] Info: Scraper is disabled by default due to cloud anti-bot/WAF blocking. Skipping board.", file=sys.stderr)
+        return company_name, [], "skipped", None
+
     # Skip extremely heavy national public-sector aggregators by default to prevent long runs or hangs
     if ats_type in ("arbetsformedlingen", "bundesagentur", "eures") and not os.getenv("ENABLE_NATIONAL_AGGREGATORS"):
         print(f"[{company_name}] Info: National aggregator is disabled by default to prevent long execution times. Set ENABLE_NATIONAL_AGGREGATORS=1 to enable.", file=sys.stderr)
