@@ -587,5 +587,11 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(job.url, "https://relocate.me/jobs/54321")
         self.assertTrue(job.has_relocation)
 
+    def test_run_pipeline_module_imports(self):
+        import run_pipeline
+        self.assertTrue(hasattr(run_pipeline, "timedelta"))
+        self.assertTrue(hasattr(run_pipeline, "datetime"))
+        self.assertTrue(hasattr(run_pipeline, "timezone"))
+
 if __name__ == "__main__":
     unittest.main()
