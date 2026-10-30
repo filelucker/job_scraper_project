@@ -34,5 +34,20 @@ class TestAutomationServices(unittest.TestCase):
         self.assertEqual(answers["#sponsor"], "yes")
         self.assertTrue(answers["#consent"])
 
+    def test_headless_detection(self):
+        import os
+        from unittest.mock import patch
+        from services.apply_browser import PlaywrightBrowserApplier
+
+        # Case 1: In CI environment without DISPLAY, force headless
+        with patch.dict(os.environ, {"CI": "true", "DISPLAY": "", "BROWSER_HEADLESS": "false"}):
+            applier = PlaywrightBrowserApplier(headless=False)
+            self.assertTrue(applier.headless)
+
+        # Case 2: Explicit BROWSER_HEADLESS=true
+        with patch.dict(os.environ, {"BROWSER_HEADLESS": "true"}):
+            applier = PlaywrightBrowserApplier(headless=False)
+            self.assertTrue(applier.headless)
+
 if __name__ == "__main__":
     unittest.main()

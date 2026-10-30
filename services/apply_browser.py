@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import random
 from typing import Dict, Any, Optional
@@ -31,13 +32,19 @@ class PlaywrightBrowserApplier:
         user_data_dir: str = "output_resumes/browser_profile"
     ):
         self.dry_run = dry_run
+        # Auto-detect headless environments (Linux without DISPLAY, CI runners, GitHub Actions)
+        is_headless_env = (sys.platform.startswith("linux") and not os.getenv("DISPLAY")) or bool(os.getenv("CI") or os.getenv("GITHUB_ACTIONS"))
         env_headless = os.getenv("BROWSER_HEADLESS", "").strip().lower()
         if env_headless in ("true", "1", "yes"):
             self.headless = True
         elif env_headless in ("false", "0", "no"):
-            self.headless = False
+            self.headless = False if not is_headless_env else True
         else:
-            self.headless = headless
+            self.headless = True if is_headless_env else headless
+
+        if is_headless_env and not self.headless:
+            print("[BrowserApplier] Headless environment detected (no X server / DISPLAY or CI). Forcing headless=True.")
+            self.headless = True
 
         self.user_data_dir = os.getenv("PLAYWRIGHT_USER_DATA_DIR", user_data_dir)
         self.profile = get_candidate_profile()
@@ -161,32 +168,48 @@ class PlaywrightBrowserApplier:
                 context = None
                 browser = None
 
-                # Attempt persistent context first (preserves session cookies & cf_clearance tokens)
+                def _launch_session(is_headless: bool):
+                    try:
+                        os.makedirs(self.user_data_dir, exist_ok=True)
+                        ctx = p.chromium.launch_persistent_context(
+                            user_data_dir=self.user_data_dir,
+                            headless=is_headless,
+                            args=launch_args,
+                            ignore_default_args=["--enable-automation"],
+                            viewport={"width": 1280, "height": 800},
+                            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                            locale="en-US"
+                        )
+                        pg = ctx.pages[0] if ctx.pages else ctx.new_page()
+                        return ctx, None, pg
+                    except Exception as ctx_err:
+                        ctx_err_str = str(ctx_err).lower()
+                        if not is_headless and any(k in ctx_err_str for k in ("xserver", "display", "platform failed", "target page, context or browser has been closed")):
+                            raise
+                        print(f"[BrowserApplier] Note: Falling back to standard browser context: {ctx_err}")
+                        br = p.chromium.launch(
+                            headless=is_headless,
+                            args=launch_args,
+                            ignore_default_args=["--enable-automation"]
+                        )
+                        ctx = br.new_context(
+                            viewport={"width": 1280, "height": 800},
+                            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                            locale="en-US"
+                        )
+                        pg = ctx.new_page()
+                        return ctx, br, pg
+
                 try:
-                    os.makedirs(self.user_data_dir, exist_ok=True)
-                    context = p.chromium.launch_persistent_context(
-                        user_data_dir=self.user_data_dir,
-                        headless=self.headless,
-                        args=launch_args,
-                        ignore_default_args=["--enable-automation"],
-                        viewport={"width": 1280, "height": 800},
-                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                        locale="en-US"
-                    )
-                    page = context.pages[0] if context.pages else context.new_page()
-                except Exception as ctx_err:
-                    print(f"[BrowserApplier] Note: Falling back to standard browser context: {ctx_err}")
-                    browser = p.chromium.launch(
-                        headless=self.headless,
-                        args=launch_args,
-                        ignore_default_args=["--enable-automation"]
-                    )
-                    context = browser.new_context(
-                        viewport={"width": 1280, "height": 800},
-                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                        locale="en-US"
-                    )
-                    page = context.new_page()
+                    context, browser, page = _launch_session(self.headless)
+                except Exception as launch_err:
+                    err_msg = str(launch_err).lower()
+                    if not self.headless and any(k in err_msg for k in ("xserver", "display", "platform failed", "target page, context or browser has been closed")):
+                        print(f"[BrowserApplier] Headed browser launch failed ({launch_err}). Automatically retrying in headless=True mode...")
+                        self.headless = True
+                        context, browser, page = _launch_session(True)
+                    else:
+                        raise
 
                 page.set_default_timeout(35000)
 

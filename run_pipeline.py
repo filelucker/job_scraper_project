@@ -407,34 +407,60 @@ def main():
                         job["Application Status"] = status_text
                         job["Applied At"] = timestamp
 
-                        # Update Telegram with individual application progress
-                        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-                            try:
-                                tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
-                                tg_msg = tg.format_auto_apply_update(job=job, result=res)
-                                screenshot = res.get("screenshot_path")
+                        # Determine if application succeeded automatically without human intervention
+                        status_lower = status_text.lower()
+                        is_applied = (
+                            res.get("success", False)
+                            and status_lower.startswith("applied")
+                            and not any(x in status_lower for x in ("draft", "fail", "error", "manual"))
+                        )
 
-                                # Send screenshot as an inline preview image with the card as its caption
-                                screenshot_sent = False
-                                if screenshot and os.path.exists(screenshot):
-                                    screenshot_sent = tg.send_photo(screenshot, caption=tg_msg)
+                        if is_applied:
+                            print(f"[Auto-Apply] Successfully auto-applied to {company} ({title}) via {channel}. Suppressing Telegram PDF/draft notification as requested.")
+                        else:
+                            # Auto-apply failed, drafted, or requires manual / human intervention -> send alert + tailored CV PDF to Telegram
+                            print(f"[Auto-Apply] Manual action / review needed for {company} ({title}) [Status: {status_text}]. Dispatching draft & tailored PDF to Telegram...")
+                            if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+                                try:
+                                    tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+                                    tg_msg = tg.format_auto_apply_update(job=job, result=res)
+                                    screenshot = res.get("screenshot_path")
 
-                                # If no screenshot or photo send failed, send as text card
-                                if not screenshot_sent:
-                                    tg.send_message(tg_msg)
+                                    # Send screenshot as an inline preview image with the card as its caption
+                                    screenshot_sent = False
+                                    if screenshot and os.path.exists(screenshot):
+                                        screenshot_sent = tg.send_photo(screenshot, caption=tg_msg)
 
-                                # Attach tailored CV PDF
-                                if pdf_path and os.path.exists(pdf_path):
-                                    tg.send_document(pdf_path, caption=f"📄 Tailored CV for {company}")
+                                    # If no screenshot or photo send failed, send as text card
+                                    if not screenshot_sent:
+                                        tg.send_message(tg_msg)
 
-                            except Exception as tg_err:
-                                print(f"[Auto-Apply] Failed sending Telegram update: {tg_err}")
+                                    # Attach tailored CV PDF so user can manually apply
+                                    if pdf_path and os.path.exists(pdf_path):
+                                        tg.send_document(pdf_path, caption=f"📄 Tailored CV for {company} (Manual Action Needed)")
+
+                                except Exception as tg_err:
+                                    print(f"[Auto-Apply] Failed sending Telegram update: {tg_err}")
 
                     except Exception as apply_err:
                         print(f"[Auto-Apply] Error processing application for {company}: {apply_err}", file=sys.stderr)
-                        job["Status"] = f"Failed ({apply_err})"
-                        job["status"] = f"Failed ({apply_err})"
-                        job["Application Status"] = f"Failed ({apply_err})"
+                        err_status = f"Failed ({apply_err})"
+                        job["Status"] = err_status
+                        job["status"] = err_status
+                        job["Application Status"] = err_status
+                        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+                            try:
+                                tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+                                failed_res = {
+                                    "channel": "ERROR",
+                                    "success": False,
+                                    "status": err_status,
+                                    "error": str(apply_err)
+                                }
+                                tg_msg = tg.format_auto_apply_update(job=job, result=failed_res)
+                                tg.send_message(tg_msg)
+                            except Exception as tg_err:
+                                print(f"[Auto-Apply] Failed sending Telegram error update: {tg_err}")
         elif new_jobs and not AUTO_APPLY_ENABLED:
             print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/application.")
 
@@ -511,7 +537,7 @@ def main():
                 except Exception as e:
                     print(f"[ERROR] Exception during Telegram routing: {e}", file=sys.stderr)
             elif new_jobs and AUTO_APPLY_ENABLED:
-                print(f"\nAll {len(new_jobs)} job(s) notified individually via auto-apply cards. Skipping duplicate batch list.")
+                print(f"\nAuto-apply processed {len(new_jobs)} job(s). Telegram notified for jobs requiring manual action. Skipping duplicate batch list.")
         else:
             print("\nTelegram Bot Token/Chat ID not set. Skipping Telegram routing.")
 

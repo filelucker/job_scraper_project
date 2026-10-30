@@ -1,4 +1,5 @@
 import os
+import sys
 from dotenv import load_dotenv
 
 # Load variables from .env file if it exists
@@ -2863,8 +2864,8 @@ APIFY_INDEED_COUNTRY = os.getenv("APIFY_INDEED_COUNTRY", "US")
 # ==========================================
 # 4. Auto-Apply & Resume Tailoring Settings
 # ==========================================
-AUTO_APPLY_ENABLED = os.getenv("AUTO_APPLY_ENABLED", "false").lower() in ("true", "1", "yes")
-AUTO_APPLY_MODE = os.getenv("AUTO_APPLY_MODE", "review").lower()  # "review", "auto", "dry_run"
+AUTO_APPLY_ENABLED = os.getenv("AUTO_APPLY_ENABLED", "true").lower() in ("true", "1", "yes")
+AUTO_APPLY_MODE = os.getenv("AUTO_APPLY_MODE", "auto").lower()  # "review", "auto", "dry_run"
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
@@ -2877,5 +2878,7 @@ DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("true", "1", "yes")
 # Anti-Bot & CAPTCHA Solver Configuration
 CAPSOLVER_API_KEY = os.getenv("CAPSOLVER_API_KEY", "")
 TWOCAPTCHA_API_KEY = os.getenv("TWOCAPTCHA_API_KEY", "")
-BROWSER_HEADLESS = os.getenv("BROWSER_HEADLESS", "false").lower() in ("true", "1", "yes")
+_is_headless_env = (sys.platform.startswith("linux") and not os.getenv("DISPLAY")) or bool(os.getenv("CI") or os.getenv("GITHUB_ACTIONS"))
+_default_browser_headless = "true" if _is_headless_env else "true"
+BROWSER_HEADLESS = os.getenv("BROWSER_HEADLESS", _default_browser_headless).lower() in ("true", "1", "yes")
 PLAYWRIGHT_USER_DATA_DIR = os.getenv("PLAYWRIGHT_USER_DATA_DIR", "output_resumes/browser_profile")

@@ -29,12 +29,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install Playwright Chromium Browser
+      - name: Install Playwright & Virtual Display (xvfb)
         run: |
+          sudo apt-get update && sudo apt-get install -y xvfb
           python -m playwright install --with-deps chromium
 
       - name: Execute Pipeline
         env:
+          # Playwright & Headless Config
+          BROWSER_HEADLESS: "true"
+
           # Telegram Routing
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -62,7 +66,7 @@ jobs:
           APIFY_LINKEDIN_LOCATION: ${{ secrets.APIFY_LINKEDIN_LOCATION }}
           APIFY_INDEED_LOCATION: ${{ secrets.APIFY_INDEED_LOCATION }}
           APIFY_INDEED_COUNTRY: ${{ secrets.APIFY_INDEED_COUNTRY }}
-        run: python run_pipeline.py
+        run: xvfb-run --auto-servernum python run_pipeline.py
 
       - name: Archive Generated Resumes & Screenshots
         if: always()

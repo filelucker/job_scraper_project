@@ -1,6 +1,7 @@
 import os
 import re
 from typing import Dict, Any, Optional
+from config import BROWSER_HEADLESS, AUTO_APPLY_MODE
 from ai.tailor import ResumeTailor
 from services.compiler import LatexCompiler
 from services.apply_greenhouse import GreenhouseApplier
@@ -14,20 +15,20 @@ class AutoApplyDispatcher:
 
     def __init__(
         self,
-        mode: str = "review",  # "review", "auto", "dry_run"
+        mode: Optional[str] = None,  # "auto", "review", "dry_run"
         gemini_api_key: Optional[str] = None,
         openai_api_key: Optional[str] = None,
         smtp_config: Optional[Dict[str, Any]] = None
     ):
-        self.mode = mode
-        self.dry_run = (mode in ("dry_run", "review"))
+        self.mode = mode or AUTO_APPLY_MODE
+        self.dry_run = (self.mode in ("dry_run", "review"))
         self.tailor = ResumeTailor(gemini_api_key=gemini_api_key, openai_api_key=openai_api_key)
         self.compiler = LatexCompiler()
         self.greenhouse_applier = GreenhouseApplier(dry_run=self.dry_run)
         self.lever_applier = LeverApplier(dry_run=self.dry_run)
         self.browser_applier = PlaywrightBrowserApplier(
             dry_run=self.dry_run,
-            headless=False,
+            headless=BROWSER_HEADLESS,
             user_data_dir="output_resumes/browser_profile"
         )
         if hasattr(self.browser_applier, "form_agent") and self.browser_applier.form_agent:
