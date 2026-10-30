@@ -21,8 +21,15 @@ class CaptchaSolver:
     4. hCaptcha: Natural behavioral mouse interaction.
     """
 
-    def __init__(self, gemini_api_key: Optional[str] = None):
+    def __init__(
+        self,
+        gemini_api_key: Optional[str] = None,
+        capsolver_api_key: Optional[str] = None,
+        twocaptcha_api_key: Optional[str] = None
+    ):
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "").strip()
+        self.capsolver_api_key = capsolver_api_key or os.getenv("CAPSOLVER_API_KEY", "").strip()
+        self.twocaptcha_api_key = twocaptcha_api_key or os.getenv("TWOCAPTCHA_API_KEY", "").strip()
 
     def solve_if_present(self, page, max_wait_sec: int = 15) -> bool:
         """
@@ -33,7 +40,7 @@ class CaptchaSolver:
         try:
             # 1. Cloudflare Turnstile Resolution
             if self._has_turnstile(page):
-                print("[CaptchaSolver] Cloudflare Turnstile detected. Solving via free behavioral interaction...")
+                print("[CaptchaSolver] Cloudflare Turnstile detected. Solving challenge...")
                 if self._solve_turnstile_free(page, max_wait_sec):
                     print("[CaptchaSolver] Successfully verified Cloudflare Turnstile.")
                     solved_any = True
@@ -58,15 +65,19 @@ class CaptchaSolver:
         return solved_any
 
     # =========================================================================
-    # Cloudflare Turnstile (100% Free Behavioral Solver)
+    # Cloudflare Turnstile (Behavioral + Coordinate + API Solver)
     # =========================================================================
 
     def _has_turnstile(self, page) -> bool:
         selectors = [
             'iframe[src*="challenges.cloudflare.com"]',
             'iframe[src*="cloudflare"]',
+            'iframe[title*="Cloudflare"]',
+            'iframe[title*="Widget containing a Cloudflare"]',
             '.cf-turnstile',
-            '#challenge-stage'
+            '#challenge-stage',
+            '#challenge-form',
+            '#challenge-running'
         ]
         for sel in selectors:
             try:
@@ -75,26 +86,245 @@ class CaptchaSolver:
                     return True
             except Exception:
                 pass
+
+        # Check for textual markers in page title or content
+        try:
+            content = page.content() if hasattr(page, "content") else ""
+            if "challenges.cloudflare.com" in content or "Additional Verification Required" in content or "cf-turnstile" in content:
+                return True
+        except Exception:
+            pass
+
+        # Check subframes
+        try:
+            for frame in getattr(page, "frames", []):
+                if "challenges.cloudflare.com" in frame.url or "cloudflare" in frame.url:
+                    return True
+        except Exception:
+            pass
+
         return False
 
-    def _solve_turnstile_free(self, page, max_wait_sec: int = 12) -> bool:
+    def _solve_turnstile_free(self, page, max_wait_sec: int = 15) -> bool:
+        """
+        Solves Cloudflare Turnstile:
+        1. Checks inside all frames (including cross-origin challenges.cloudflare.com).
+        2. Tries clicking the checkbox element directly via frame locator or coordinates.
+        3. If elements are shielded inside iframe, calculates the parent iframe's bounding box
+           and clicks the expected checkbox position (~28px from left, vertically centered).
+        4. Waits and verifies if challenge resolves or response token is generated.
+        5. If CapSolver / 2Captcha API key is set and free click doesn't pass, falls back to API solver.
+        """
         try:
-            for frame in page.frames:
-                checkbox = frame.query_selector('input[type="checkbox"], #challenge-stage, .ctp-checkbox-label')
-                if checkbox and checkbox.is_visible():
-                    box = checkbox.bounding_box()
-                    if box:
-                        target_x = box["x"] + box["width"] / 2 + random.uniform(-3, 3)
-                        target_y = box["y"] + box["height"] / 2 + random.uniform(-3, 3)
-                        page.mouse.move(target_x, target_y, steps=random.randint(15, 25))
-                        time.sleep(random.uniform(0.2, 0.4))
-                        page.mouse.click(target_x, target_y)
-                        time.sleep(2)
-                        page.wait_for_load_state("networkidle", timeout=max_wait_sec * 1000)
+            time.sleep(1.0)
+            clicked = False
+
+            # Strategy 1: Search inside all frames
+            for frame in getattr(page, "frames", []):
+                if "challenges.cloudflare.com" in frame.url or "cloudflare" in frame.url or frame != getattr(page, "main_frame", None):
+                    try:
+                        targets = [
+                            'input[type="checkbox"]',
+                            '#challenge-stage',
+                            '.ctp-checkbox-label',
+                            'label.ctp-checkbox-label',
+                            'span.mark',
+                            '#cf-stage'
+                        ]
+                        for sel in targets:
+                            checkbox = frame.query_selector(sel)
+                            if checkbox:
+                                box = checkbox.bounding_box()
+                                if box and box.get("width", 0) > 0 and box.get("height", 0) > 0:
+                                    target_x = box["x"] + box["width"] / 2 + random.uniform(-2, 2)
+                                    target_y = box["y"] + box["height"] / 2 + random.uniform(-2, 2)
+                                    page.mouse.move(target_x, target_y, steps=random.randint(12, 22))
+                                    time.sleep(random.uniform(0.15, 0.35))
+                                    page.mouse.click(target_x, target_y)
+                                    clicked = True
+                                    print(f"[CaptchaSolver] Clicked Turnstile element '{sel}' in iframe.")
+                                    break
+                                elif hasattr(frame, "locator"):
+                                    loc = frame.locator(sel).first
+                                    if loc.count() > 0:
+                                        loc.click(timeout=3000, force=True)
+                                        clicked = True
+                                        print(f"[CaptchaSolver] Triggered locator click on Turnstile '{sel}'.")
+                                        break
+                        if clicked:
+                            break
+                    except Exception:
+                        pass
+
+            # Strategy 2: If frame was cross-origin or elements unclickable, click on the iframe bounding box directly
+            if not clicked:
+                iframe_selectors = [
+                    'iframe[src*="challenges.cloudflare.com"]',
+                    'iframe[src*="cloudflare"]',
+                    '#challenge-stage iframe',
+                    '.cf-turnstile iframe'
+                ]
+                for isel in iframe_selectors:
+                    try:
+                        iel = page.query_selector(isel)
+                        if iel and iel.is_visible():
+                            ibox = iel.bounding_box()
+                            if ibox:
+                                click_x = ibox["x"] + min(32, ibox["width"] * 0.15) + random.uniform(-2, 2)
+                                click_y = ibox["y"] + (ibox["height"] / 2) + random.uniform(-2, 2)
+                                page.mouse.move(click_x, click_y, steps=random.randint(15, 25))
+                                time.sleep(random.uniform(0.2, 0.4))
+                                page.mouse.click(click_x, click_y)
+                                clicked = True
+                                print(f"[CaptchaSolver] Clicked Turnstile checkbox via iframe coordinates ({int(click_x)}, {int(click_y)}).")
+                                break
+                    except Exception:
+                        pass
+
+            # Wait and check for resolution
+            start_wait = time.time()
+            while time.time() - start_wait < max_wait_sec:
+                time.sleep(1.0)
+                try:
+                    token = page.evaluate("""() => {
+                        const input = document.querySelector('input[name="cf-turnstile-response"]');
+                        return input ? input.value : '';
+                    }""")
+                    if token and len(token) > 10:
+                        print("[CaptchaSolver] Turnstile verified: cf-turnstile-response token acquired.")
                         return True
+                except Exception:
+                    pass
+
+                if not self._has_turnstile(page):
+                    print("[CaptchaSolver] Turnstile challenge passed: challenge elements no longer present.")
+                    return True
+
+            # Fallback to paid API solvers if configured
+            if self.capsolver_api_key:
+                print("[CaptchaSolver] Attempting CapSolver API resolution...")
+                if self._solve_turnstile_capsolver(page):
+                    return True
+            elif self.twocaptcha_api_key:
+                print("[CaptchaSolver] Attempting 2Captcha API resolution...")
+                if self._solve_turnstile_2captcha(page):
+                    return True
+
         except Exception as e:
             print(f"[CaptchaSolver] Turnstile resolution note: {e}")
+
+        return not self._has_turnstile(page)
+
+    def _extract_turnstile_sitekey(self, page) -> Optional[str]:
+        """Extracts Cloudflare Turnstile sitekey from the page DOM or iframe URL."""
+        try:
+            sitekey = page.evaluate("""() => {
+                const el = document.querySelector('[data-sitekey]');
+                if (el) return el.getAttribute('data-sitekey');
+                const iframe = document.querySelector('iframe[src*="challenges.cloudflare.com"]');
+                if (iframe) {
+                    const m = iframe.src.match(/sitekey=([^&]+)/);
+                    if (m) return decodeURIComponent(m[1]);
+                }
+                const cfDiv = document.querySelector('.cf-turnstile');
+                if (cfDiv && cfDiv.dataset && cfDiv.dataset.sitekey) return cfDiv.dataset.sitekey;
+                return '';
+            }""")
+            return sitekey.strip() if sitekey else None
+        except Exception:
+            return None
+
+    def _solve_turnstile_capsolver(self, page, timeout_sec: int = 30) -> bool:
+        """Solves Turnstile challenge via CapSolver API if key is provided."""
+        sitekey = self._extract_turnstile_sitekey(page)
+        if not sitekey:
+            return False
+        page_url = getattr(page, "url", "")
+        try:
+            payload = {
+                "clientKey": self.capsolver_api_key,
+                "task": {
+                    "type": "AntiTurnstileTaskProxyLess",
+                    "websiteURL": page_url,
+                    "websiteKey": sitekey
+                }
+            }
+            res = requests.post("https://api.capsolver.com/createTask", json=payload, timeout=10).json()
+            task_id = res.get("taskId")
+            if not task_id:
+                return False
+
+            start_t = time.time()
+            while time.time() - start_t < timeout_sec:
+                time.sleep(2)
+                check_res = requests.post(
+                    "https://api.capsolver.com/getTaskResult",
+                    json={"clientKey": self.capsolver_api_key, "taskId": task_id},
+                    timeout=10
+                ).json()
+                if check_res.get("status") == "ready":
+                    token = check_res.get("solution", {}).get("token")
+                    if token:
+                        self._inject_turnstile_token(page, token)
+                        return True
+                elif check_res.get("status") == "failed":
+                    break
+        except Exception as e:
+            print(f"[CaptchaSolver] CapSolver error: {e}")
         return False
+
+    def _solve_turnstile_2captcha(self, page, timeout_sec: int = 30) -> bool:
+        """Solves Turnstile challenge via 2Captcha API if key is provided."""
+        sitekey = self._extract_turnstile_sitekey(page)
+        if not sitekey:
+            return False
+        page_url = getattr(page, "url", "")
+        try:
+            req_url = f"https://2captcha.com/in.php?key={self.twocaptcha_api_key}&method=turnstile&sitekey={sitekey}&pageurl={page_url}&json=1"
+            in_res = requests.get(req_url, timeout=10).json()
+            if in_res.get("status") != 1:
+                return False
+            req_id = in_res.get("request")
+
+            start_t = time.time()
+            while time.time() - start_t < timeout_sec:
+                time.sleep(3)
+                res_url = f"https://2captcha.com/res.php?key={self.twocaptcha_api_key}&action=get&id={req_id}&json=1"
+                out_res = requests.get(res_url, timeout=10).json()
+                if out_res.get("status") == 1:
+                    token = out_res.get("request")
+                    if token:
+                        self._inject_turnstile_token(page, token)
+                        return True
+                elif out_res.get("request") != "CAPCHA_NOT_READY":
+                    break
+        except Exception as e:
+            print(f"[CaptchaSolver] 2Captcha error: {e}")
+        return False
+
+    def _inject_turnstile_token(self, page, token: str):
+        """Injects solved Turnstile token into form input and triggers callbacks."""
+        try:
+            page.evaluate(f"""(token) => {{
+                let input = document.querySelector('input[name="cf-turnstile-response"]');
+                if (!input) {{
+                    input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'cf-turnstile-response';
+                    document.body.appendChild(input);
+                }}
+                input.value = token;
+                if (typeof window.turnstile !== 'undefined' && window.turnstile.reset) {{
+                    try {{ window.turnstile.reset(); }} catch(e) {{}}
+                }}
+                const form = input.closest('form');
+                if (form) {{
+                    form.submit();
+                }}
+            }}""", token)
+            time.sleep(2)
+        except Exception:
+            pass
 
     # =========================================================================
     # Google reCAPTCHA (100% Free Anchor + Audio Challenge Solver)

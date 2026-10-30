@@ -664,9 +664,6 @@ COMPANY_BOARDS = {
     'Column Bank': {'ats': 'ashby', 'token': 'column'},
 
     # --- National Public-Sector Aggregators ---
-    'Arbetsförmedlingen (SE)': {'ats': 'arbetsformedlingen', 'token': 'arbetsformedlingen'},
-    'Bundesagentur (DE)': {'ats': 'bundesagentur', 'token': 'bundesagentur'},
-    'Eures (EU)': {'ats': 'eures', 'token': 'eures'},
     'USAJobs (US)': {'ats': 'usajobs', 'token': 'usajobs'},
 
     # --- UAE & Middle East Tech Scaleups ---
@@ -1096,7 +1093,6 @@ COMPANY_BOARDS = {
     'DataStax Cassandra': {'ats': 'greenhouse', 'token': 'datastax'},
     'Dave Banking Tech': {'ats': 'greenhouse', 'token': 'dave'},
     'DeepL Translation Engine': {'ats': 'ashby', 'token': 'deepl'},
-    'DeepMind Intelligence': {'ats': 'google', 'token': '*'},
     'Deepnote Data Notebooks': {'ats': 'ashby', 'token': 'deepnote'},
     'Delphix Data Ops': {'ats': 'greenhouse', 'token': 'delphix'},
     'Denodo Data Virtualization': {'ats': 'greenhouse', 'token': 'denodo'},
@@ -1287,7 +1283,6 @@ COMPANY_BOARDS = {
     'Indeed': {'ats': 'indeed', 'token': '*'},
     'Arbeitnow': {'ats': 'arbeitnow', 'token': '*'},
     'WeAreDevelopers': {'ats': 'wearedevelopers', 'token': '*'},
-    'GermanTechJobs': {'ats': 'germantechjobs', 'token': '*'},
     'Relocate.me': {'ats': 'relocateme', 'token': '*'},
 }
 
@@ -1340,3 +1335,9 @@ SENDER_NAME = os.getenv("SENDER_NAME", "Md Moniruzzaman")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("true", "1", "yes")
+
+# Anti-Bot & CAPTCHA Solver Configuration
+CAPSOLVER_API_KEY = os.getenv("CAPSOLVER_API_KEY", "")
+TWOCAPTCHA_API_KEY = os.getenv("TWOCAPTCHA_API_KEY", "")
+BROWSER_HEADLESS = os.getenv("BROWSER_HEADLESS", "false").lower() in ("true", "1", "yes")
+PLAYWRIGHT_USER_DATA_DIR = os.getenv("PLAYWRIGHT_USER_DATA_DIR", "output_resumes/browser_profile")

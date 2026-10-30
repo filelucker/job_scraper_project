@@ -35,5 +35,24 @@ class TestCaptchaSolver(unittest.TestCase):
         dummy_page = DummyPageWithTurnstile()
         self.assertTrue(self.solver._has_turnstile(dummy_page))
 
+    def test_extract_turnstile_sitekey(self):
+        class DummyPage:
+            def evaluate(self, script):
+                return "0x4AAAAAAtestSiteKey"
+
+        self.assertEqual(self.solver._extract_turnstile_sitekey(DummyPage()), "0x4AAAAAAtestSiteKey")
+
+    def test_inject_turnstile_token(self):
+        class DummyPage:
+            executed = False
+            def evaluate(self, script, arg):
+                self.executed = True
+                self.arg = arg
+
+        page = DummyPage()
+        self.solver._inject_turnstile_token(page, "sample_token_123")
+        self.assertTrue(page.executed)
+        self.assertEqual(page.arg, "sample_token_123")
+
 if __name__ == "__main__":
     unittest.main()

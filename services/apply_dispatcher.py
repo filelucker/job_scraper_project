@@ -25,7 +25,11 @@ class AutoApplyDispatcher:
         self.compiler = LatexCompiler()
         self.greenhouse_applier = GreenhouseApplier(dry_run=self.dry_run)
         self.lever_applier = LeverApplier(dry_run=self.dry_run)
-        self.browser_applier = PlaywrightBrowserApplier(dry_run=self.dry_run)
+        self.browser_applier = PlaywrightBrowserApplier(
+            dry_run=self.dry_run,
+            headless=False,
+            user_data_dir="output_resumes/browser_profile"
+        )
         if hasattr(self.browser_applier, "form_agent") and self.browser_applier.form_agent:
             self.browser_applier.form_agent.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
             self.browser_applier.form_agent.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")

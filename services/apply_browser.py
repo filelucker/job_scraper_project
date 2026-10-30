@@ -24,9 +24,22 @@ class PlaywrightBrowserApplier:
     4. AI-powered dynamic form inspection, field filling, and auto-submission
     """
 
-    def __init__(self, dry_run: bool = True, headless: bool = True):
+    def __init__(
+        self,
+        dry_run: bool = True,
+        headless: bool = False,
+        user_data_dir: str = "output_resumes/browser_profile"
+    ):
         self.dry_run = dry_run
-        self.headless = headless
+        env_headless = os.getenv("BROWSER_HEADLESS", "").strip().lower()
+        if env_headless in ("true", "1", "yes"):
+            self.headless = True
+        elif env_headless in ("false", "0", "no"):
+            self.headless = False
+        else:
+            self.headless = headless
+
+        self.user_data_dir = os.getenv("PLAYWRIGHT_USER_DATA_DIR", user_data_dir)
         self.profile = get_candidate_profile()
         self.form_agent = FormAgent()
         self.captcha_solver = CaptchaSolver()
@@ -39,20 +52,45 @@ class PlaywrightBrowserApplier:
             except Exception as e:
                 print(f"[BrowserApplier] Note: stealth_sync init: {e}")
 
-        # Additional stealth overrides to defeat Cloudflare Turnstile & bot detection
+        # Advanced stealth overrides to defeat Cloudflare Turnstile & bot detection
         stealth_js = """
         () => {
-            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-            window.navigator.chrome = {
-                runtime: {},
+            try {
+                const newProto = navigator.__proto__;
+                delete newProto.webdriver;
+            } catch (e) {}
+            Object.defineProperty(Navigator.prototype, 'webdriver', {
+                get: () => undefined,
+                configurable: true
+            });
+
+            window.chrome = {
+                runtime: {
+                    OnInstalledReason: { INSTALL: 'install', UPDATE: 'update', CHROME_UPDATE: 'chrome_update' },
+                    OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update' },
+                    PlatformArch: { ARM: 'arm', X86_32: 'x86-32', X86_64: 'x86-64' },
+                    PlatformNaclArch: { ARM: 'arm', X86_32: 'x86-32', X86_64: 'x86-64' },
+                    PlatformOs: { ANDROID: 'android', CROS: 'cros', LINUX: 'linux', MAC: 'mac', OPENBSD: 'openbsd', WIN: 'win' }
+                },
                 loadTimes: function() {},
                 csi: function() {},
                 app: {}
             };
+
+            if (window.navigator.permissions) {
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters && parameters.name === 'notifications'
+                        ? Promise.resolve({ state: Notification.permission })
+                        : originalQuery(parameters)
+                );
+            }
+
             Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
             Object.defineProperty(navigator, 'plugins', {
                 get: () => [1, 2, 3, 4, 5]
             });
+
             const getParameter = WebGLRenderingContext.prototype.getParameter;
             WebGLRenderingContext.prototype.getParameter = function(parameter) {
                 if (parameter === 37445) return 'Intel Inc.';
@@ -66,54 +104,14 @@ class PlaywrightBrowserApplier:
         except Exception:
             pass
 
-    def _handle_cloudflare_turnstile(self, page, max_wait_sec: int = 12):
+    def _handle_cloudflare_turnstile(self, page, max_wait_sec: int = 15):
         """
         Detects Cloudflare Turnstile bot verification challenges and attempts
-        to solve/click the checkbox with human-like movement.
+        to solve/click the checkbox with behavioral simulation or solver.
         """
-        turnstile_detected = False
-        try:
-            # Check for Cloudflare Turnstile iframe or container
-            cf_selectors = [
-                'iframe[src*="cloudflare"]',
-                'iframe[src*="challenges"]',
-                'iframe[title*="Cloudflare"]',
-                'iframe[title*="Widget containing a Cloudflare"]',
-                '#challenge-stage',
-                '.cf-turnstile'
-            ]
-            for sel in cf_selectors:
-                el = page.query_selector(sel)
-                if el and el.is_visible():
-                    turnstile_detected = True
-                    break
-
-            if turnstile_detected:
-                print("[BrowserApplier] Cloudflare Turnstile challenge detected. Attempting human-like resolution...")
-                # Search across all frames for the checkbox
-                for frame in page.frames:
-                    try:
-                        checkbox = frame.query_selector('input[type="checkbox"], #challenge-stage, .ctp-checkbox-label')
-                        if checkbox and checkbox.is_visible():
-                            box = checkbox.bounding_box()
-                            if box:
-                                # Move mouse naturally to the checkbox center with a slight random offset
-                                target_x = box["x"] + box["width"] / 2 + random.uniform(-4, 4)
-                                target_y = box["y"] + box["height"] / 2 + random.uniform(-4, 4)
-                                page.mouse.move(target_x, target_y, steps=random.randint(10, 25))
-                                time.sleep(random.uniform(0.2, 0.5))
-                                page.mouse.click(target_x, target_y)
-                                print("[BrowserApplier] Clicked Cloudflare Turnstile verification checkbox.")
-                                break
-                    except Exception:
-                        pass
-
-                # Wait for verification to resolve and redirect
-                page.wait_for_load_state("networkidle", timeout=max_wait_sec * 1000)
-                time.sleep(2)
-        except Exception as e:
-            # Non-blocking if no challenge is present
-            pass
+        if self.captcha_solver._has_turnstile(page):
+            print("[BrowserApplier] Cloudflare Turnstile challenge detected. Attempting resolution...")
+            self.captcha_solver._solve_turnstile_free(page, max_wait_sec=max_wait_sec)
 
     def apply(
         self,
@@ -124,7 +122,7 @@ class PlaywrightBrowserApplier:
     ) -> Dict[str, Any]:
         """
         1. Resolves canonical ATS/career URL if aggregator.
-        2. Opens browser with anti-detection stealth.
+        2. Opens browser with anti-detection stealth & persistent profile.
         3. Handles Cloudflare Turnstile if present.
         4. Dynamically inspects form and answers fields using AI + candidate profile.
         5. In 'auto' mode submits; in 'review'/'dry_run' captures preview screenshot.
@@ -148,24 +146,49 @@ class PlaywrightBrowserApplier:
 
         try:
             with sync_playwright() as p:
-                # Launch Chromium with anti-automation flags
-                browser = p.chromium.launch(
-                    headless=self.headless,
-                    args=[
-                        "--disable-blink-features=AutomationControlled",
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-infobars",
-                        "--window-size=1280,800"
-                    ]
-                )
-                context = browser.new_context(
-                    viewport={"width": 1280, "height": 800},
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    locale="en-US"
-                )
-                page = context.new_page()
-                page.set_default_timeout(30000)
+                launch_args = [
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-infobars",
+                    "--window-size=1280,800",
+                    "--disable-dev-shm-usage",
+                    "--no-first-run",
+                    "--no-service-autorun",
+                    "--password-store=basic"
+                ]
+
+                context = None
+                browser = None
+
+                # Attempt persistent context first (preserves session cookies & cf_clearance tokens)
+                try:
+                    os.makedirs(self.user_data_dir, exist_ok=True)
+                    context = p.chromium.launch_persistent_context(
+                        user_data_dir=self.user_data_dir,
+                        headless=self.headless,
+                        args=launch_args,
+                        ignore_default_args=["--enable-automation"],
+                        viewport={"width": 1280, "height": 800},
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                        locale="en-US"
+                    )
+                    page = context.pages[0] if context.pages else context.new_page()
+                except Exception as ctx_err:
+                    print(f"[BrowserApplier] Note: Falling back to standard browser context: {ctx_err}")
+                    browser = p.chromium.launch(
+                        headless=self.headless,
+                        args=launch_args,
+                        ignore_default_args=["--enable-automation"]
+                    )
+                    context = browser.new_context(
+                        viewport={"width": 1280, "height": 800},
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                        locale="en-US"
+                    )
+                    page = context.new_page()
+
+                page.set_default_timeout(35000)
 
                 # Step 2: Inject Stealth Scripts
                 self._inject_stealth_scripts(page)
@@ -193,12 +216,10 @@ class PlaywrightBrowserApplier:
                     try:
                         btn = page.query_selector(btn_sel)
                         if btn and btn.is_visible():
-                            # Don't click navigation menus or unrelated buttons
                             btn_text = (btn.inner_text() or "").strip()
                             if len(btn_text) < 30:
                                 btn.click()
                                 time.sleep(random.uniform(1.5, 2.5))
-                                # Re-check for CAPTCHA if clicking Apply loaded a challenge modal
                                 self.captcha_solver.solve_if_present(page)
                                 break
                     except Exception:
@@ -253,7 +274,16 @@ class PlaywrightBrowserApplier:
                         "message": "Application submitted successfully." if submitted else "Form filled but submit button requires confirmation."
                     }
 
-                browser.close()
+                try:
+                    context.close()
+                except Exception:
+                    pass
+                if browser:
+                    try:
+                        browser.close()
+                    except Exception:
+                        pass
+
                 return submission_result
 
         except PlaywrightTimeoutError as te:
