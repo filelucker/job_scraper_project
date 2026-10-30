@@ -1,6 +1,6 @@
 # Autonomous Job Scraper & AI Auto-Apply Pipeline 🚀
 
-A modular, enterprise-grade Python automation engine that concurrently scans **1,000+ top company career boards and global aggregators**, matches listings using compound keyword rules, generates **custom-tailored LaTeX resumes on the fly**, and applies automatically across multiple channels (**Direct ATS APIs, SMTP Email, and Playwright Web Form Agents with Cloudflare Turnstile evasion**).
+A modular, enterprise-grade Python automation engine that concurrently scans **2,500+ top company career boards and global aggregators**, matches listings using compound keyword rules, generates **custom-tailored LaTeX resumes on the fly**, and applies automatically across multiple channels (**Direct ATS APIs, SMTP Email, and Playwright Web Form Agents with Cloudflare Turnstile evasion**).
 
 Matches and application statuses are synced in real time to **Google Sheets** and dispatched to **Telegram** alongside tailored CV PDFs and form preview screenshots.
 
