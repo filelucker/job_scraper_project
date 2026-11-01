@@ -51,27 +51,30 @@ class UrlResolver:
         if not url:
             return url
 
+        # Direct ATS URLs (Greenhouse, Lever, Ashby, Workable, etc.) should not be unwrapped as aggregators
+        if cls.is_direct_ats(url):
+            return url
+
+        parsed = urlparse(url)
+        netloc = (parsed.netloc or "").lower()
+
         resolved_url = url
         try:
-            # Check aggregator-specific extraction first
-            if "arbeitnow" in url.lower():
+            # Check aggregator-specific extraction first by domain, not query parameters
+            if "arbeitnow" in netloc:
                 extracted = cls._extract_from_arbeitnow(url, timeout)
                 if extracted:
                     return extracted
 
-            if "jooble.org" in url.lower():
+            if "jooble.org" in netloc:
                 extracted = cls._extract_from_jooble(url, timeout)
                 if extracted:
                     return extracted
 
-            if "ycombinator.com" in url.lower():
+            if "ycombinator.com" in netloc:
                 extracted = cls._extract_from_ycombinator(url, timeout)
                 if extracted:
                     return extracted
-
-            if cls.is_direct_ats(url):
-                return url
-
             # General redirect resolver
             resolved_url = cls._follow_redirects(url, timeout)
             if cls.is_direct_ats(resolved_url):

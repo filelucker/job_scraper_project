@@ -31,7 +31,7 @@ class CaptchaSolver:
         self.capsolver_api_key = capsolver_api_key or os.getenv("CAPSOLVER_API_KEY", "").strip()
         self.twocaptcha_api_key = twocaptcha_api_key or os.getenv("TWOCAPTCHA_API_KEY", "").strip()
 
-    def solve_if_present(self, page, max_wait_sec: int = 15) -> bool:
+    def solve_if_present(self, page, max_wait_sec: int = 6) -> bool:
         """
         Detects and solves any active CAPTCHA challenges on the page without paid APIs.
         Returns True if a challenge was detected and solved.
@@ -105,7 +105,7 @@ class CaptchaSolver:
 
         return False
 
-    def _solve_turnstile_free(self, page, max_wait_sec: int = 15) -> bool:
+    def _solve_turnstile_free(self, page, max_wait_sec: int = 6) -> bool:
         """
         Solves Cloudflare Turnstile:
         1. Checks inside all frames (including cross-origin challenges.cloudflare.com).

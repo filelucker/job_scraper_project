@@ -3,7 +3,7 @@ import sys
 import time
 import random
 from typing import Dict, Any, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, urlunparse
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 try:
@@ -185,14 +185,23 @@ class PlaywrightBrowserApplier:
             print(f"[BrowserApplier] Resolved aggregator link: {job_url} -> {resolved_url}")
         target_url = resolved_url
 
-        # Direct ATS URL normalizations to skip overview pages and hit application forms directly
+        # Direct ATS URL normalizations to hit application forms directly without breaking query params
         direct_apply_url = target_url
-        if "apply.workable.com" in target_url and not target_url.rstrip("/").endswith("/apply"):
-            direct_apply_url = target_url.rstrip("/") + "/apply/"
-        elif ("jobs.personio.com" in target_url or "jobs.personio.de" in target_url) and not target_url.rstrip("/").endswith("/apply"):
-            direct_apply_url = target_url.rstrip("/") + "/apply"
-        elif "jobs.lever.co" in target_url and not target_url.rstrip("/").endswith("/apply"):
-            direct_apply_url = target_url.rstrip("/") + "/apply"
+        parsed_target = urlparse(target_url)
+        target_path = parsed_target.path.rstrip("/")
+        if "apply.workable.com" in parsed_target.netloc:
+            if not target_path.endswith("/apply"):
+                new_path = f"{target_path}/apply/"
+                direct_apply_url = urlunparse((parsed_target.scheme, parsed_target.netloc, new_path, '', parsed_target.query, ''))
+        elif "jobs.personio" in parsed_target.netloc:
+            if not target_path.endswith("/apply"):
+                new_path = f"{target_path}/apply"
+                direct_apply_url = urlunparse((parsed_target.scheme, parsed_target.netloc, new_path, '', parsed_target.query, ''))
+        elif "jobs.lever.co" in parsed_target.netloc:
+            parts = [p for p in target_path.split("/") if p]
+            if len(parts) >= 2 and not target_path.endswith("/apply"):
+                new_path = f"{target_path}/apply"
+                direct_apply_url = urlunparse((parsed_target.scheme, parsed_target.netloc, new_path, '', parsed_target.query, ''))
 
         try:
             with sync_playwright() as p:
@@ -336,6 +345,15 @@ class PlaywrightBrowserApplier:
                             pass
 
                 print(f"[BrowserApplier] Found {len(controls)} interactive form control(s) on the page.")
+
+                if len(controls) == 0:
+                    print(f"[BrowserApplier] No interactive form controls found on {nav_url}. Skipping submission.")
+                    return {
+                        "success": False,
+                        "submitted": False,
+                        "filled_fields_count": 0,
+                        "error": "No interactive form fields detected on page"
+                    }
 
                 answers = self.form_agent.answer_fields(controls, candidate)
 

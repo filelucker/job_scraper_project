@@ -493,10 +493,14 @@ def main():
             print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/application.")
 
         # --- 3. Optional: Reprocess existing unapplied jobs in Google Sheets ---
-        if sheets_active and GOOGLE_CREDENTIALS_JSON and AUTO_APPLY_ENABLED and os.getenv("AUTO_APPLY_REPROCESS_UNAPPLIED", "true").lower() in ("true", "1"):
-            print("\n[Auto-Apply] Checking for unapplied 'Apply via URL' rows in Google Sheets to re-process...")
+        reprocess_enabled = os.getenv("AUTO_APPLY_REPROCESS_UNAPPLIED", "false").lower() in ("true", "1")
+        if sheets_active and GOOGLE_CREDENTIALS_JSON and AUTO_APPLY_ENABLED and reprocess_enabled:
+            max_reprocess = int(os.getenv("MAX_REPROCESS_JOBS", "5"))
+            print(f"\n[Auto-Apply] Checking up to {max_reprocess} pending rows in Google Sheets to process...")
             try:
-                unapplied_jobs = sheets_router.get_unapplied_jobs()
+                unapplied_jobs = sheets_router.get_unapplied_jobs(max_jobs=max_reprocess)
+                processed_urls = {j.get("URL") for j in jobs_to_apply} if jobs_to_apply else set()
+                unapplied_jobs = [j for j in unapplied_jobs if j.get("URL") not in processed_urls]
                 if unapplied_jobs:
                     print(f"[Auto-Apply] Found {len(unapplied_jobs)} unapplied job(s) in sheet. Processing...")
                     if not dispatcher:

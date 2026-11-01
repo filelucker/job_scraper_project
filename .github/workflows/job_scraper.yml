@@ -10,6 +10,7 @@ on:
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Checkout Repository
@@ -35,10 +36,13 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Execute Pipeline
+        timeout-minutes: 20
         env:
           # Playwright & Headless Config
           BROWSER_HEADLESS: "true"
           JOB_LOOKBACK_HOURS: "6"
+          AUTO_APPLY_REPROCESS_UNAPPLIED: "false"
+          MAX_REPROCESS_JOBS: "5"
 
           # Telegram Routing
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

@@ -80,8 +80,12 @@ class GoogleSheetsRouter:
             print(f"[Google Sheets Router] Error fetching existing URLs: {e}")
             return []
 
-    def get_unapplied_jobs(self) -> List[Dict[str, Any]]:
-        """Fetch all rows where Application Status is 'Apply via URL' or 'Pending' and Applied At is empty."""
+    def get_unapplied_jobs(self, max_jobs: int = 5) -> List[Dict[str, Any]]:
+        """
+        Fetch rows that are explicitly pending or drafted for auto-application.
+        Limits inspection to recent records and skips rows already finalized
+        ('Applied', 'Apply via URL', 'Skipped', or having Applied At timestamp).
+        """
         if not self.credentials_json:
             return []
         try:
@@ -89,20 +93,37 @@ class GoogleSheetsRouter:
             if not worksheet:
                 return []
             records = worksheet.get_all_records()
+            if not records:
+                return []
+
+            # Only inspect recent records (up to last 100 rows) to avoid massive processing queues
+            recent_records = records[-100:]
             unapplied = []
-            for row in records:
-                status = str(row.get("Application Status", "")).strip()
+            for row in recent_records:
+                raw_status = str(row.get("Application Status", "")).strip()
+                status_lower = raw_status.lower()
                 applied_at = str(row.get("Applied At", "")).strip()
-                if ("Apply via" in status or "Pending" in status or "Draft" in status):
+
+                # Skip any job that was already finalized or attempted
+                if any(k in status_lower for k in ["apply via url", "applied", "skipped", "failed", "closed"]):
+                    continue
+                if applied_at:
+                    continue
+
+                # Only pick up explicitly 'pending' or 'draft' jobs that have never been applied
+                if "pending" in status_lower or "draft" in status_lower:
                     unapplied.append({
                         "Company": row.get("Company", ""),
                         "Title": row.get("Title", ""),
                         "Location": row.get("Location", ""),
                         "URL": row.get("URL", ""),
                         "Contact Email": row.get("Contact Email", ""),
-                        "Application Status": status,
+                        "Application Status": raw_status,
                         "Applied At": applied_at
                     })
+                    if len(unapplied) >= max_jobs:
+                        break
+
             return unapplied
         except Exception as e:
             print(f"[Google Sheets Router] Error fetching unapplied jobs: {e}")

@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 import re
 from typing import Dict, Any, Optional
 from config import BROWSER_HEADLESS, AUTO_APPLY_MODE
@@ -9,6 +10,16 @@ from services.apply_lever import LeverApplier
 from services.apply_browser import PlaywrightBrowserApplier
 from services.url_resolver import UrlResolver
 from routers.email_router import EmailRouter
+
+LOGIN_REQUIRED_AGGREGATORS = (
+    "indeed.com",
+    "linkedin.com",
+    "glassdoor.com",
+    "ziprecruiter.com",
+    "wellfound.com",
+    "angel.co",
+    "flexjobs.com"
+)
 
 class AutoApplyDispatcher:
     """Unified application manager routing jobs to the most effective application channel."""
@@ -48,13 +59,20 @@ class AutoApplyDispatcher:
     def detect_channel(self, job: Dict[str, Any], target_url: Optional[str] = None) -> str:
         """Identify the best application channel for a job."""
         url = (target_url or job.get("URL") or "").lower()
+        parsed = urlparse(url)
+        netloc = (parsed.netloc or "").lower()
 
         if job.get("Contact Email"):
             return "EMAIL"
-        if "greenhouse.io" in url or "gh_jid" in url:
+        if "greenhouse.io" in netloc or "gh_jid" in url:
             return "GREENHOUSE"
-        if "jobs.lever.co" in url:
+        if "jobs.lever.co" in netloc:
             return "LEVER"
+        
+        # Aggregator platforms requiring candidate account logins / 2FA cannot be auto-submitted via anonymous forms
+        if any(agg in netloc for agg in LOGIN_REQUIRED_AGGREGATORS):
+            return "MANUAL_URL"
+
         return "BROWSER"
 
     def process_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
@@ -75,6 +93,17 @@ class AutoApplyDispatcher:
         if target_url != raw_url:
             print(f"  • Canonical Resolved URL: {target_url}")
         print(f"  • Channel: {channel} | Mode: {self.mode}")
+
+        if channel == "MANUAL_URL":
+            print(f"[AutoApplyDispatcher] Aggregator platform requires direct candidate login ({target_url}). Marking 'Apply via URL'.")
+            return {
+                "channel": channel,
+                "success": False,
+                "pdf_path": "",
+                "status": "Apply via URL",
+                "screenshot_path": None,
+                "details": {"notice": "Aggregator platform requires direct candidate login."}
+            }
 
         # 1. AI Tailoring
         tailored = self.tailor.tailor(job)

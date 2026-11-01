@@ -85,3 +85,4 @@ class RemotiveHandler(BaseHandler):
             has_relocation=has_relocation,
             has_visa_sponsorship=has_visa
         )
+

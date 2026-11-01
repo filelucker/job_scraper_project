@@ -225,5 +225,51 @@ class TestAutoApplyPipeline(unittest.TestCase):
             self.assertEqual(gh_res["status"], "Applied (Web Portal)")
             self.assertTrue(gh_res["success"])
 
+
+    def test_8_aggregator_bypass_and_lever_preservation(self):
+        from services.url_resolver import UrlResolver
+
+        # 1. Test direct Lever URL with Arbeitnow UTM preserves the application link
+        lever_url = "https://jobs.lever.co/veepee/5ccd15e3-2b03-47dd-abc9-19fd321a2960/apply?utm_source=arbeitnow.fr"
+        resolved = UrlResolver.resolve(lever_url)
+        self.assertEqual(resolved, lever_url)
+
+        # 2. Test AutoApplyDispatcher immediately bypasses Indeed/LinkedIn aggregator URLs
+        dispatcher = AutoApplyDispatcher(mode="auto")
+        indeed_job = {
+            "Title": "Mobile App Developer",
+            "Company": "Dev Idea Studio",
+            "URL": "https://www.indeed.com/viewjob?jk=62ecff1bbdc4c42c"
+        }
+        self.assertEqual(dispatcher.detect_channel(indeed_job), "MANUAL_URL")
+        res = dispatcher.process_job(indeed_job)
+        self.assertEqual(res["channel"], "MANUAL_URL")
+        self.assertEqual(res["status"], "Apply via URL")
+        self.assertFalse(res["success"])
+
+        # 3. Test get_unapplied_jobs skips finalized/apply-via-url rows and enforces max_jobs
+        from routers import GoogleSheetsRouter
+        from unittest.mock import MagicMock, patch
+
+        router = GoogleSheetsRouter('{"type": "service_account"}', "Test Sheet", "Jobs")
+        mock_client = MagicMock()
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_client.open.return_value = mock_spreadsheet
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_worksheet.get_all_records.return_value = [
+            {"Company": "C1", "Title": "T1", "URL": "http://1", "Application Status": "Apply via URL", "Applied At": ""},
+            {"Company": "C2", "Title": "T2", "URL": "http://2", "Application Status": "Applied (Web Portal)", "Applied At": "2026-11-01"},
+            {"Company": "C3", "Title": "T3", "URL": "http://3", "Application Status": "Pending", "Applied At": ""},
+            {"Company": "C4", "Title": "T4", "URL": "http://4", "Application Status": "Drafted", "Applied At": ""},
+            {"Company": "C5", "Title": "T5", "URL": "http://5", "Application Status": "Pending", "Applied At": ""}
+        ]
+
+        with patch.object(router, '_get_client', return_value=mock_client):
+            unapplied = router.get_unapplied_jobs(max_jobs=2)
+            self.assertEqual(len(unapplied), 2)
+            self.assertEqual(unapplied[0]["Company"], "C3")
+            self.assertEqual(unapplied[1]["Company"], "C4")
+
 if __name__ == "__main__":
     unittest.main()
