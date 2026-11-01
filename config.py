@@ -2540,7 +2540,6 @@ COMPANY_BOARDS = {
     'Telligen': {'ats': 'lever', 'token': 'telligen'},
     'TELUS Digital': {'ats': 'ashby', 'token': 'telus-digital'},
     'Tempo': {'ats': 'ashby', 'token': 'tempo-io'},
-    'Tempo (2)': {'ats': 'ashby', 'token': 'tempo'},
     'Tenergy': {'ats': 'smartrecruiters', 'token': 'Tenergy'},
     'Tenet3': {'ats': 'greenhouse', 'token': 'tenet3'},
     'Tenon': {'ats': 'greenhouse', 'token': 'tenon'},
@@ -2580,7 +2579,6 @@ COMPANY_BOARDS = {
     'Thoughtworks': {'ats': 'greenhouse', 'token': 'thoughtworksreferral'},
     'Thrive Causemetics': {'ats': 'lever', 'token': 'thrivecausemetics'},
     'TickPick': {'ats': 'workable', 'token': 'tickpick'},
-    'Tilde Research': {'ats': 'ashby', 'token': 'tilderesearch'},
     'Tint': {'ats': 'greenhouse', 'token': 'tintai'},
     'Titan': {'ats': 'ashby', 'token': 'titan-msp'},
     'Tive': {'ats': 'rippling', 'token': 'tive-careers'},
@@ -2813,7 +2811,7 @@ COMPANY_BOARDS = {
     'Arbeitnow': {'ats': 'arbeitnow', 'token': '*'},
     'BuiltIn': {'ats': 'builtin', 'token': '*'},
     'Get on Board (LATAM)': {'ats': 'getonbrd', 'token': '*'},
-    'Indeed': {'ats': 'indeed', 'token': '*'},
+    # 'Indeed': {'ats': 'indeed', 'token': '*'},  # Disabled: Apify credits exhausted (402)
     'Jooble': {'ats': 'jooble', 'token': '*'},
     'LinkedIn': {'ats': 'linkedin', 'token': '*'},
     'Relocate.me': {'ats': 'relocateme', 'token': '*'},
@@ -2821,7 +2819,7 @@ COMPANY_BOARDS = {
     'USAJobs (US)': {'ats': 'usajobs', 'token': 'usajobs'},
     'We Work Remotely': {'ats': 'fallback', 'token': 'https://weworkremotely.com/remote-jobs.rss'},
     'WeAreDevelopers': {'ats': 'wearedevelopers', 'token': '*'},
-    'Wellfound': {'ats': 'wellfound', 'token': '*'},
+    # 'Wellfound': {'ats': 'wellfound', 'token': '*'},  # Disabled: Firecrawl credits exhausted (402)
     'Y Combinator': {'ats': 'ycombinator', 'token': '*'},
 }
 
