@@ -6,7 +6,7 @@ from handlers.base import BaseHandler, Job
 class WellfoundHandler(BaseHandler):
     """
     Handler for scraping Wellfound (formerly AngelList Talent) startup jobs
-    using direct browser automation (Playwright) with zero API keys or credit limits.
+    using direct browser automation (Playwright + Stealth) with zero API keys or credit limits.
     """
     
     def __init__(
@@ -22,6 +22,12 @@ class WellfoundHandler(BaseHandler):
 
     def fetch_raw_jobs(self) -> List[Dict[str, Any]]:
         from playwright.sync_api import sync_playwright
+
+        try:
+            from playwright_stealth import Stealth
+            stealth = Stealth()
+        except Exception:
+            stealth = None
 
         all_listings = []
         target_urls = [
@@ -40,12 +46,17 @@ class WellfoundHandler(BaseHandler):
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
-                page = browser.new_page(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-                )
                 
                 for url in target_urls:
+                    context = None
                     try:
+                        context = browser.new_context(
+                            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+                        )
+                        page = context.new_page()
+                        if stealth:
+                            stealth.apply_stealth_sync(page)
+
                         resp = page.goto(url, timeout=25000)
                         if not resp or resp.status != 200:
                             continue
@@ -86,6 +97,12 @@ class WellfoundHandler(BaseHandler):
                             })
                     except Exception as role_err:
                         print(f"[Wellfound - Direct] Error fetching {url}: {role_err}")
+                    finally:
+                        if context:
+                            try:
+                                context.close()
+                            except Exception:
+                                pass
                         
                 browser.close()
         except Exception as e:
@@ -128,4 +145,3 @@ class WellfoundHandler(BaseHandler):
             url=url.strip(),
             posted_time=posted_time
         )
-

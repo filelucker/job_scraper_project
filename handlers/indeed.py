@@ -8,7 +8,7 @@ from handlers.base import BaseHandler, Job
 class IndeedHandler(BaseHandler):
     """
     Handler for scraping Indeed jobs.
-    Uses direct browser automation (Playwright) by default with zero API fees or limits,
+    Uses direct browser automation (Playwright + Stealth) by default with zero API fees or limits,
     with an optional fallback to Apify actor if explicitly configured.
     """
     def __init__(
@@ -33,21 +33,24 @@ class IndeedHandler(BaseHandler):
         self.countries = countries or [{"name": "Default", "indeed_domain": f"www.indeed.com" if country.lower() == "us" else f"{country.lower()}.indeed.com"}]
 
     def _fetch_via_playwright(self) -> List[Dict[str, Any]]:
-        """Fetch jobs directly from Indeed via Playwright with no API tokens, fees, or quota limits."""
+        """Fetch jobs directly from Indeed via Playwright with stealth evasions and no quota limits."""
         import urllib.parse
         from playwright.sync_api import sync_playwright
+
+        try:
+            from playwright_stealth import Stealth
+            stealth = Stealth()
+        except Exception:
+            stealth = None
 
         all_results = []
         query = " OR ".join([f'"{kw}"' for kw in self.keywords])
         fromage = 1 if self.lookback_hours <= 24 else (3 if self.lookback_hours <= 72 else 7)
         
-        print(f"[Indeed - Direct] Initiating direct browser scrape for {len(self.countries)} domain(s) without API limits...")
+        print(f"[Indeed - Direct] Initiating stealth browser scrape across {len(self.countries)} domain(s) without API limits...")
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
-                page = browser.new_page(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-                )
                 
                 for country_cfg in self.countries:
                     domain = country_cfg.get("indeed_domain") or "www.indeed.com"
@@ -56,12 +59,21 @@ class IndeedHandler(BaseHandler):
                     search_url = f"https://{domain}/jobs?q={encoded_query}&l={encoded_location}&fromage={fromage}&sort=date"
                     
                     print(f"[Indeed - Direct] Scraping {domain}...")
+                    context = None
                     try:
-                        resp = page.goto(search_url, timeout=30000)
+                        # Use clean isolated context with stealth per domain to avoid cross-domain 403 flags
+                        context = browser.new_context(
+                            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+                        )
+                        page = context.new_page()
+                        if stealth:
+                            stealth.apply_stealth_sync(page)
+
+                        resp = page.goto(search_url, timeout=25000)
                         if not resp or resp.status != 200:
                             print(f"[Indeed - Direct] {domain} returned status {resp.status if resp else 'None'}. Skipping.")
                             continue
-                        page.wait_for_timeout(2000)
+                        page.wait_for_timeout(1500)
                         
                         # Extract structured jobs from window.mosaic
                         mosaic_jobs = page.evaluate("""() => {
@@ -107,9 +119,14 @@ class IndeedHandler(BaseHandler):
                                 return out;
                             }""", domain)
                             all_results.extend(dom_cards)
-                            
                     except Exception as domain_err:
                         print(f"[Indeed - Direct] Error fetching {domain}: {domain_err}")
+                    finally:
+                        if context:
+                            try:
+                                context.close()
+                            except Exception:
+                                pass
                 
                 browser.close()
         except Exception as e:
