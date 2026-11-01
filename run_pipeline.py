@@ -44,7 +44,8 @@ from handlers import (
     GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler,
     WorkdayHandler, WorkableHandler, SmartRecruitersHandler, JobhiveAdapterHandler,
     AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler,
-    ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler
+    ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler,
+    WellfoundHandler
 )
 from handlers.email_extractor import JobEmailExtractor
 from routers import TelegramRouter, GoogleSheetsRouter, EmailRouter
@@ -149,10 +150,6 @@ def fetch_board(company_name: str, board_config: dict):
         print(f"[USAJobs - {company_name}] Info: USAJOBS_API_KEY is not set. Skipping board.", file=sys.stderr)
         return company_name, [], "skipped", None
 
-    if ats_type == "wellfound" and not os.getenv("FIRECRAWL_API_KEY"):
-        print(f"[Wellfound - {company_name}] Info: FIRECRAWL_API_KEY is not set. Skipping board.", file=sys.stderr)
-        return company_name, [], "skipped", None
-
     if ats_type == "adzuna" and (not ADZUNA_APP_ID or not ADZUNA_APP_KEY):
         print(f"[Adzuna - {company_name}] Info: ADZUNA_APP_ID or ADZUNA_APP_KEY is not set. Skipping board.", file=sys.stderr)
         return company_name, [], "skipped", None
@@ -163,10 +160,6 @@ def fetch_board(company_name: str, board_config: dict):
 
     if ats_type == "linkedin" and (not APIFY_API_TOKEN or APIFY_API_TOKEN.startswith("your_apify_")):
         print(f"[LinkedIn - {company_name}] Info: APIFY_API_TOKEN is not set or is placeholder. Skipping board.", file=sys.stderr)
-        return company_name, [], "skipped", None
-
-    if ats_type == "indeed" and (not APIFY_API_TOKEN or APIFY_API_TOKEN.startswith("your_apify_")):
-        print(f"[Indeed - {company_name}] Info: APIFY_API_TOKEN is not set or is placeholder. Skipping board.", file=sys.stderr)
         return company_name, [], "skipped", None
 
     if ats_type == "germantechjobs" and not GERMANTECHJOBS_COOKIE and not JOBCOPILOT_TOKEN:
@@ -238,6 +231,15 @@ def fetch_board(company_name: str, board_config: dict):
             location=APIFY_INDEED_LOCATION,
             country=APIFY_INDEED_COUNTRY,
             countries=[{"indeed_domain": dom} for dom in INDEED_GLOBAL_DOMAINS],
+            compound_rules=COMPOUND_RULES
+        )
+    elif ats_type == "wellfound":
+        handler = WellfoundHandler(
+            company_name,
+            token,
+            KEYWORDS,
+            JOB_LOOKBACK_HOURS,
+            only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID,
             compound_rules=COMPOUND_RULES
         )
     elif JOBHIVE_AVAILABLE and ats_type in JOBHIVE_ATS_TYPES:

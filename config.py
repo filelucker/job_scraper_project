@@ -2811,7 +2811,7 @@ COMPANY_BOARDS = {
     'Arbeitnow': {'ats': 'arbeitnow', 'token': '*'},
     'BuiltIn': {'ats': 'builtin', 'token': '*'},
     'Get on Board (LATAM)': {'ats': 'getonbrd', 'token': '*'},
-    # 'Indeed': {'ats': 'indeed', 'token': '*'},  # Disabled: Apify credits exhausted (402)
+    'Indeed': {'ats': 'indeed', 'token': '*'},
     'Jooble': {'ats': 'jooble', 'token': '*'},
     'LinkedIn': {'ats': 'linkedin', 'token': '*'},
     'Relocate.me': {'ats': 'relocateme', 'token': '*'},
@@ -2819,7 +2819,7 @@ COMPANY_BOARDS = {
     'USAJobs (US)': {'ats': 'usajobs', 'token': 'usajobs'},
     'We Work Remotely': {'ats': 'fallback', 'token': 'https://weworkremotely.com/remote-jobs.rss'},
     'WeAreDevelopers': {'ats': 'wearedevelopers', 'token': '*'},
-    # 'Wellfound': {'ats': 'wellfound', 'token': '*'},  # Disabled: Firecrawl credits exhausted (402)
+    'Wellfound': {'ats': 'wellfound', 'token': '*'},
     'Y Combinator': {'ats': 'ycombinator', 'token': '*'},
 }
 

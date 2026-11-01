@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone, timedelta
-from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler, ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler
+from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler, ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler, WellfoundHandler
 from handlers.base import BaseHandler
 
 class DummyHandler(BaseHandler):
@@ -492,6 +492,26 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(job.location, "New York, NY")
         self.assertEqual(job.url, "https://www.indeed.com/viewjob?jk=54321")
         self.assertEqual(job.posted_time.day, 15)
+
+    def test_wellfound_handler_parsing(self):
+        handler = WellfoundHandler("Wellfound", "*", ["Flutter", "Software Engineer"], 24)
+        raw_job = {
+            "id": "123456",
+            "slug": "senior-flutter-engineer",
+            "title": "Senior Flutter Engineer",
+            "startup_name": "RocketStart Inc.",
+            "startup_slug": "rocketstart",
+            "location_names": ["San Francisco"],
+            "accepted_remote": ["United States"],
+            "remote": True,
+            "liveStartAt": 1788295528
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "RocketStart Inc.")
+        self.assertEqual(job.title, "Senior Flutter Engineer")
+        self.assertIn("Remote", job.location)
+        self.assertEqual(job.url, "https://wellfound.com/jobs/123456-senior-flutter-engineer")
 
     def test_arbeitnow_parsing(self):
         handler = ArbeitnowHandler("Arbeitnow", "*", ["Android", "Flutter"], 24)

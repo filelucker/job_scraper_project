@@ -16,12 +16,12 @@ from handlers.arbeitnow import ArbeitnowHandler
 from handlers.wearedevelopers import WeAreDevelopersHandler
 from handlers.germantechjobs import GermanTechJobsHandler
 from handlers.relocateme import RelocateMeHandler
+from handlers.wellfound import WellfoundHandler
 
 __all__ = [
     "BaseHandler", "Job", "GreenhouseHandler", "LeverHandler", "FallbackHandler",
     "AshbyHandler", "WorkdayHandler", "WorkableHandler", "SmartRecruitersHandler",
     "JobhiveAdapterHandler", "AdzunaHandler", "JoobleHandler", "FlexjobsHandler",
     "LinkedInHandler", "IndeedHandler", "ArbeitnowHandler", "WeAreDevelopersHandler",
-    "GermanTechJobsHandler", "RelocateMeHandler"
+    "GermanTechJobsHandler", "RelocateMeHandler", "WellfoundHandler"
 ]
-
