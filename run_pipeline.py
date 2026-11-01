@@ -257,6 +257,8 @@ def main():
     skipped_boards = []
     failed_boards = []
     all_matched_jobs = []
+    job_dicts = []
+    jobs_to_apply = []
     new_jobs = []
 
     log_filename = "pipeline.log"
@@ -301,7 +303,7 @@ def main():
                     else:
                         scanned_boards.append(company_name)
                         if matched_jobs:
-                            print(f"[{company_name}] Found {len(matched_jobs)} matching job(s) posted in the last 24 hours!")
+                            print(f"[{company_name}] Found {len(matched_jobs)} matching job(s) posted in the last {JOB_LOOKBACK_HOURS} hours!")
                             for job in matched_jobs:
                                 print(f"  - {job.title} ({job.location}) -> {job.url}")
                             all_matched_jobs.extend(matched_jobs)
@@ -314,10 +316,22 @@ def main():
         sheets_active = False
 
         if all_matched_jobs:
-            # Convert matching Job objects to dictionary format
-            job_dicts = [job.to_dict() for job in all_matched_jobs]
+            # Convert matching Job objects to dictionary format (deduplicating URLs within current run)
+            seen_matched_urls = set()
+            job_dicts = []
+            for job in all_matched_jobs:
+                jdict = job.to_dict()
+                jurl = jdict.get("URL")
+                if jurl and jurl not in seen_matched_urls:
+                    seen_matched_urls.add(jurl)
+                    job_dicts.append(jdict)
+                elif not jurl:
+                    job_dicts.append(jdict)
 
-            # --- Deduplication logic ---
+            # Apply to all Jobs Matched in this run
+            jobs_to_apply = job_dicts
+
+            # --- Deduplication logic for Google Sheets new records ---
             existing_urls = []
 
             # 1. Fetch existing URLs from Google Sheets if configured
@@ -350,16 +364,16 @@ def main():
             # Combine Google Sheets & local cache to form a comprehensive deduplication set
             all_existing_urls = set(existing_urls + local_existing_urls)
 
-            # Filter job list to only new listings
+            # Filter job list to identify newly discovered listings
             new_jobs = [job for job in job_dicts if job["URL"] not in all_existing_urls]
-            print(f"Filtered out {len(job_dicts) - len(new_jobs)} duplicate(s). {len(new_jobs)} new job(s) to process.")
+            print(f"Identified {len(new_jobs)} new job(s) out of {len(job_dicts)} matched job(s).")
         else:
             print("No matches found. Skipping deduplication and export.")
 
         # --- Enrich jobs with application method / email detection ---
-        if new_jobs:
-            print("\nAnalyzing application channels for new jobs...")
-            for job in new_jobs:
+        if jobs_to_apply:
+            print(f"\nAnalyzing application channels for {len(jobs_to_apply)} matched job(s)...")
+            for job in jobs_to_apply:
                 analysis = JobEmailExtractor.analyze_job(job)
                 job["Contact Email"] = analysis.get("email") or ""
                 job["Application Status"] = analysis.get("initial_status", "Pending")
@@ -367,9 +381,9 @@ def main():
                 if job["Contact Email"]:
                     print(f"  • {job.get('Company')} -> Application Email found: {job['Contact Email']}")
 
-        # --- 2. Auto-Apply & Customized CV Pipeline ---
-        if new_jobs and AUTO_APPLY_ENABLED:
-            print(f"\n[Auto-Apply] Processing {len(new_jobs)} new job(s) via AutoApplyDispatcher in '{AUTO_APPLY_MODE}' mode...")
+        # --- 2. Auto-Apply & Customized CV Pipeline (Applies to all Jobs Matched) ---
+        if jobs_to_apply and AUTO_APPLY_ENABLED:
+            print(f"\n[Auto-Apply] Processing all {len(jobs_to_apply)} matched job(s) via AutoApplyDispatcher in '{AUTO_APPLY_MODE}' mode...")
             try:
                 dispatcher = AutoApplyDispatcher(
                     mode=AUTO_APPLY_MODE,
@@ -389,7 +403,7 @@ def main():
 
             if dispatcher:
                 bst_tz = timezone(timedelta(hours=6))
-                for job in new_jobs:
+                for job in jobs_to_apply:
                     company = job.get("Company", "Company")
                     title = job.get("Title", "Job")
                     url = job.get("URL", "")
@@ -461,7 +475,7 @@ def main():
                                 tg.send_message(tg_msg)
                             except Exception as tg_err:
                                 print(f"[Auto-Apply] Failed sending Telegram error update: {tg_err}")
-        elif new_jobs and not AUTO_APPLY_ENABLED:
+        elif jobs_to_apply and not AUTO_APPLY_ENABLED:
             print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/application.")
 
         # --- 3. Optional: Reprocess existing unapplied jobs in Google Sheets ---
@@ -495,14 +509,30 @@ def main():
             try:
                 sheets_success = sheets_router.append_jobs(new_jobs)
                 if sheets_success:
-                    print("Google Sheets export completed successfully.")
+                    print(f"Google Sheets export of {len(new_jobs)} new job(s) completed successfully.")
                 else:
                     print("Google Sheets export failed. Check logs for details.")
             except Exception as e:
                 print(f"[ERROR] Exception during Google Sheets routing: {e}", file=sys.stderr)
 
+        # Update application status for previously tracked jobs that were re-applied in this run
+        if sheets_active and GOOGLE_CREDENTIALS_JSON:
+            existing_applied_jobs = [j for j in jobs_to_apply if j.get("URL") in existing_urls]
+            if existing_applied_jobs:
+                print(f"\nUpdating status for {len(existing_applied_jobs)} previously tracked job(s) in Google Sheets...")
+                for ejob in existing_applied_jobs:
+                    try:
+                        sheets_router.update_application_status(
+                            job_url=ejob.get("URL", ""),
+                            status=ejob.get("Application Status") or ejob.get("Status", "Processed"),
+                            contact_email=ejob.get("Contact Email", ""),
+                            applied_at=ejob.get("Applied At")
+                        )
+                    except Exception as update_err:
+                        print(f"[Google Sheets Router] Error updating existing job {ejob.get('Company')}: {update_err}")
+
         # --- Update local state cache ---
-        if new_jobs:
+        if job_dicts:
             local_state_file = "scraped_jobs.json"
             local_existing_urls = []
             if os.path.exists(local_state_file):
@@ -511,7 +541,7 @@ def main():
                         local_existing_urls = json.load(f)
                 except Exception as e:
                     pass
-            new_urls_to_cache = list(set(local_existing_urls + [job["URL"] for job in new_jobs]))
+            new_urls_to_cache = list(set(local_existing_urls + [job["URL"] for job in job_dicts]))
             try:
                 with open(local_state_file, "w") as f:
                     json.dump(new_urls_to_cache, f, indent=2)
@@ -521,14 +551,14 @@ def main():
 
         # --- 3. Route findings to Telegram (only if auto-apply did not run, to prevent duplicate spam) ---
         if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-            if not AUTO_APPLY_ENABLED and new_jobs:
+            if not AUTO_APPLY_ENABLED and job_dicts:
                 print("\nDispatching alerts to Telegram...")
                 try:
                     telegram_router = TelegramRouter(
                         bot_token=TELEGRAM_BOT_TOKEN,
                         chat_id=TELEGRAM_CHAT_ID
                     )
-                    formatted_msg = telegram_router.format_jobs_message(new_jobs, lookback_hours=JOB_LOOKBACK_HOURS)
+                    formatted_msg = telegram_router.format_jobs_message(job_dicts, lookback_hours=JOB_LOOKBACK_HOURS)
                     telegram_success = telegram_router.send_message(formatted_msg)
                     if telegram_success:
                         print("Telegram notification dispatched successfully.")
@@ -536,8 +566,8 @@ def main():
                         print("Telegram notification dispatch failed.")
                 except Exception as e:
                     print(f"[ERROR] Exception during Telegram routing: {e}", file=sys.stderr)
-            elif new_jobs and AUTO_APPLY_ENABLED:
-                print(f"\nAuto-apply processed {len(new_jobs)} job(s). Telegram notified for jobs requiring manual action. Skipping duplicate batch list.")
+            elif jobs_to_apply and AUTO_APPLY_ENABLED:
+                print(f"\nAuto-apply processed {len(jobs_to_apply)} job(s). Telegram notified for jobs requiring manual action. Skipping duplicate batch list.")
         else:
             print("\nTelegram Bot Token/Chat ID not set. Skipping Telegram routing.")
 
@@ -570,22 +600,23 @@ def main():
                     bot_token=TELEGRAM_BOT_TOKEN,
                     chat_id=TELEGRAM_CHAT_ID
                 )
+                active_matched_jobs = jobs_to_apply if ('jobs_to_apply' in locals() and jobs_to_apply) else (job_dicts if 'job_dicts' in locals() else [])
                 active_new_jobs = new_jobs if ('new_jobs' in locals() and new_jobs) else []
                 total_applied = sum(
-                    1 for j in active_new_jobs
+                    1 for j in active_matched_jobs
                     if "applied" in str(j.get("Application Status", "") or j.get("Status", "")).lower()
                 )
                 total_drafted = sum(
-                    1 for j in active_new_jobs
+                    1 for j in active_matched_jobs
                     if any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("draft", "review"))
                 )
                 failed_jobs_list = [
                     (j.get("Company", "Unknown"), str(j.get("Application Status", "") or j.get("Status", "")))
-                    for j in active_new_jobs
+                    for j in active_matched_jobs
                     if any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("fail", "error"))
                 ]
                 total_failed = len(failed_jobs_list)
-                total_unapplied = max(0, len(active_new_jobs) - total_applied - total_drafted - total_failed)
+                total_unapplied = max(0, len(active_matched_jobs) - total_applied - total_drafted - total_failed)
 
                 summary_msg = telegram_router.format_run_summary(
                     duration_seconds=duration_seconds,

@@ -98,7 +98,7 @@ COMPOUND_RULES = [
 ]
 
 # Time limit in hours for jobs posted
-JOB_LOOKBACK_HOURS = int(os.getenv("JOB_LOOKBACK_HOURS", "6"))
+JOB_LOOKBACK_HOURS = int(os.getenv("JOB_LOOKBACK_HOURS", "24"))
 
 # Location filtering: If True, only jobs matching 'remote' or 'hybrid' in location/title are processed
 ONLY_REMOTE_OR_HYBRID = True

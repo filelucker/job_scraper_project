@@ -202,7 +202,7 @@ PLAYWRIGHT_USER_DATA_DIR=output_resumes/browser_profile
 # ==========================================
 # Lookback Window
 # ==========================================
-JOB_LOOKBACK_HOURS=6                      # Only scan postings from the last 6 hours
+JOB_LOOKBACK_HOURS=24                     # Only scan postings from the last 24 hours
 ```
 
 ---
