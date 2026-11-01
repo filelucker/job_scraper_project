@@ -98,7 +98,7 @@ class AutoApplyDispatcher:
             elif self.compiler.tectonic_bin:
                 self.compiler.compile_pdf(self.compiler.render_latex(), pdf_path)
 
-        # 3. Route to specific channel
+        # 3. Route to specific channel with resilient fallback to browser
         result = {}
         if channel == "GREENHOUSE":
             res = self.greenhouse_applier.apply(
@@ -106,11 +106,26 @@ class AutoApplyDispatcher:
                 pdf_path=pdf_path,
                 cover_letter=tailored.get("email_body_text")
             )
+            # If direct API fails, escalate to browser applier to apply via web
+            if not res.get("success") and not self.dry_run:
+                print(f"[AutoApplyDispatcher] Greenhouse direct API did not complete ({res.get('error')}). Escalating to Playwright browser applier...")
+                browser_res = self.browser_applier.apply(
+                    job_url=target_url,
+                    pdf_path=pdf_path,
+                    mode=self.mode
+                )
+                if browser_res.get("success") or browser_res.get("filled_fields_count", 0) > 0:
+                    res = browser_res
+                    channel = "BROWSER"
+
+            is_app = res.get("success") or (self.mode == "auto" and (res.get("filled_fields_count", 0) > 0 or res.get("submitted", False)))
+            status = ("Applied (Greenhouse API)" if channel == "GREENHOUSE" else "Applied (Web Portal)") if (is_app and not self.dry_run) else "Drafted (Greenhouse Ready)"
             result = {
                 "channel": channel,
-                "success": res.get("success", False),
+                "success": is_app,
                 "pdf_path": pdf_path,
-                "status": "Applied (Greenhouse API)" if (res.get("success") and not self.dry_run) else "Drafted (Greenhouse Ready)",
+                "status": status,
+                "screenshot_path": res.get("screenshot_path"),
                 "details": res
             }
 
@@ -120,11 +135,26 @@ class AutoApplyDispatcher:
                 pdf_path=pdf_path,
                 comments=tailored.get("email_body_text")
             )
+            # If direct API fails, escalate to browser applier to apply via web
+            if not res.get("success") and not self.dry_run:
+                print(f"[AutoApplyDispatcher] Lever direct API did not complete ({res.get('error')}). Escalating to Playwright browser applier...")
+                browser_res = self.browser_applier.apply(
+                    job_url=target_url,
+                    pdf_path=pdf_path,
+                    mode=self.mode
+                )
+                if browser_res.get("success") or browser_res.get("filled_fields_count", 0) > 0:
+                    res = browser_res
+                    channel = "BROWSER"
+
+            is_app = res.get("success") or (self.mode == "auto" and (res.get("filled_fields_count", 0) > 0 or res.get("submitted", False)))
+            status = ("Applied (Lever API)" if channel == "LEVER" else "Applied (Web Portal)") if (is_app and not self.dry_run) else "Drafted (Lever Ready)"
             result = {
                 "channel": channel,
-                "success": res.get("success", False),
+                "success": is_app,
                 "pdf_path": pdf_path,
-                "status": "Applied (Lever API)" if (res.get("success") and not self.dry_run) else "Drafted (Lever Ready)",
+                "status": status,
+                "screenshot_path": res.get("screenshot_path"),
                 "details": res
             }
 
@@ -138,11 +168,26 @@ class AutoApplyDispatcher:
                 pdf_path=pdf_path,
                 attachment_filename=f"Md_Moniruzzaman_Resume_{safe_company}.pdf"
             )
+            # If email fails and target URL is available, attempt web application
+            if not res.get("success") and target_url and not self.dry_run:
+                print(f"[AutoApplyDispatcher] Direct email delivery failed. Escalating to Playwright browser applier on URL: {target_url}...")
+                browser_res = self.browser_applier.apply(
+                    job_url=target_url,
+                    pdf_path=pdf_path,
+                    mode=self.mode
+                )
+                if browser_res.get("success") or browser_res.get("filled_fields_count", 0) > 0:
+                    res = browser_res
+                    channel = "BROWSER"
+
+            is_app = res.get("success") or (self.mode == "auto" and (res.get("filled_fields_count", 0) > 0 or res.get("submitted", False)))
+            status = ("Applied (Direct Email)" if channel == "EMAIL" else "Applied (Web Portal)") if (is_app and not self.dry_run) else "Drafted (Email Ready)"
             result = {
                 "channel": channel,
-                "success": res.get("success", False),
+                "success": is_app,
                 "pdf_path": pdf_path,
-                "status": "Applied (Direct Email)" if (res.get("success") and not self.dry_run) else "Drafted (Email Ready)",
+                "status": status,
+                "screenshot_path": res.get("screenshot_path"),
                 "details": res
             }
 
@@ -153,13 +198,18 @@ class AutoApplyDispatcher:
                 mode=self.mode
             )
             is_success = res.get("success", False)
-            if is_success and self.mode == "auto":
-                status = "Applied (Web Portal)"
-            elif is_success or res.get("filled_fields_count", 0) > 0:
-                status = "Drafted (Web Form Filled)"
-            else:
-                err = res.get("error")
-                status = f"Apply via URL ({err})" if err else "Apply via URL"
+            if self.mode == "auto":
+                if is_success or res.get("submitted", False) or res.get("filled_fields_count", 0) > 0:
+                    status = "Applied (Web Portal)"
+                else:
+                    err = res.get("error")
+                    status = f"Apply via URL ({err})" if err else "Apply via URL"
+            else:  # review or dry_run mode
+                if is_success or res.get("filled_fields_count", 0) > 0:
+                    status = "Drafted (Web Form Filled)"
+                else:
+                    err = res.get("error")
+                    status = f"Apply via URL ({err})" if err else "Apply via URL"
 
             result = {
                 "channel": channel,

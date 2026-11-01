@@ -31,7 +31,7 @@ DEFAULT_HEADERS = {
 
 class UrlResolver:
     """
-    Resolves job aggregator URLs (e.g. Arbeitnow, Jooble, Indeed, LinkedIn)
+    Resolves job aggregator URLs (e.g. Arbeitnow, Jooble, Indeed, LinkedIn, Y Combinator)
     into direct, canonical employer application and ATS URLs.
     """
 
@@ -48,7 +48,7 @@ class UrlResolver:
         Takes a job URL and attempts to extract the underlying direct ATS or career URL.
         Falls back to the original URL if no external redirect is detected.
         """
-        if not url or cls.is_direct_ats(url):
+        if not url:
             return url
 
         resolved_url = url
@@ -63,6 +63,14 @@ class UrlResolver:
                 extracted = cls._extract_from_jooble(url, timeout)
                 if extracted:
                     return extracted
+
+            if "ycombinator.com" in url.lower():
+                extracted = cls._extract_from_ycombinator(url, timeout)
+                if extracted:
+                    return extracted
+
+            if cls.is_direct_ats(url):
+                return url
 
             # General redirect resolver
             resolved_url = cls._follow_redirects(url, timeout)
@@ -160,6 +168,83 @@ class UrlResolver:
                     return href
         except Exception:
             pass
+        return None
+
+    @classmethod
+    def _extract_from_ycombinator(cls, url: str, timeout: int = 15) -> Optional[str]:
+        """Resolves YC job links to the company's canonical ATS posting."""
+        try:
+            m = re.search(r'ycombinator\.com/companies/([^/]+)/jobs/([^/]+)', url)
+            if not m:
+                return None
+            company_slug = m.group(1).lower().strip()
+
+            session = requests.Session()
+            session.headers.update(DEFAULT_HEADERS)
+            resp = session.get(url, timeout=timeout)
+            if resp.status_code != 200:
+                return None
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            job_title = ""
+            company_website = ""
+
+            for s in soup.find_all("script", type="application/ld+json"):
+                try:
+                    data = json.loads(s.string or "")
+                    if isinstance(data, dict) and data.get("@type") == "JobPosting":
+                        job_title = (data.get("title") or "").strip().lower()
+                        org = data.get("hiringOrganization") or {}
+                        company_website = org.get("sameAs") or ""
+                        break
+                except Exception:
+                    pass
+
+            title_words = [w for w in re.split(r'\W+', job_title) if len(w) > 3]
+
+            # 1. Direct ATS endpoints for the company slug
+            candidate_ats_roots = [
+                (f"https://jobs.ashbyhq.com/{company_slug}", "ashby"),
+                (f"https://job-boards.greenhouse.io/{company_slug}", "greenhouse"),
+                (f"https://jobs.lever.co/{company_slug}", "lever"),
+                (f"https://apply.workable.com/{company_slug}", "workable")
+            ]
+
+            for ats_url, ats_name in candidate_ats_roots:
+                try:
+                    ats_resp = session.get(ats_url, timeout=5)
+                    if ats_resp.status_code == 200:
+                        ats_soup = BeautifulSoup(ats_resp.text, "html.parser")
+                        for a in ats_soup.find_all("a", href=True):
+                            href = a["href"]
+                            link_text = (a.get_text() or "").strip().lower()
+                            if title_words and any(w in link_text for w in title_words):
+                                return urljoin(ats_url, href)
+                except Exception:
+                    pass
+
+            # 2. Inspect company website /careers or /jobs
+            if company_website:
+                for path in ["/careers", "/careers/", "/jobs", "/jobs/"]:
+                    careers_url = urljoin(company_website, path)
+                    try:
+                        c_resp = session.get(careers_url, timeout=5)
+                        if c_resp.status_code == 200:
+                            c_soup = BeautifulSoup(c_resp.text, "html.parser")
+                            for a in c_soup.find_all("a", href=True):
+                                href = a["href"]
+                                if any(d in href.lower() for d in KNOWN_ATS_DOMAINS):
+                                    if title_words and any(w in (a.get_text() or "").lower() for w in title_words):
+                                        return href
+                            # Return any direct ATS link on careers page if found
+                            for a in c_soup.find_all("a", href=True):
+                                href = a["href"]
+                                if any(d in href.lower() for d in KNOWN_ATS_DOMAINS):
+                                    return href
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[UrlResolver] YC extraction notice: {e}")
         return None
 
     @classmethod

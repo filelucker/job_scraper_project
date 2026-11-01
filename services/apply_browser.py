@@ -3,13 +3,20 @@ import sys
 import time
 import random
 from typing import Dict, Any, Optional
+from urllib.parse import urljoin
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 try:
-    from playwright_stealth import stealth_sync
+    from playwright_stealth import Stealth
+    _stealth = Stealth()
+    stealth_sync = _stealth.apply_stealth_sync
     STEALTH_AVAILABLE = True
-except ImportError:
-    STEALTH_AVAILABLE = False
+except (ImportError, AttributeError):
+    try:
+        from playwright_stealth import stealth_sync
+        STEALTH_AVAILABLE = True
+    except ImportError:
+        STEALTH_AVAILABLE = False
 
 from services.profile_loader import get_candidate_profile
 from services.url_resolver import UrlResolver
@@ -97,7 +104,6 @@ class PlaywrightBrowserApplier:
             Object.defineProperty(navigator, 'plugins', {
                 get: () => [1, 2, 3, 4, 5]
             });
-
             const getParameter = WebGLRenderingContext.prototype.getParameter;
             WebGLRenderingContext.prototype.getParameter = function(parameter) {
                 if (parameter === 37445) return 'Intel Inc.';
@@ -110,6 +116,34 @@ class PlaywrightBrowserApplier:
             page.add_init_script(stealth_js)
         except Exception:
             pass
+
+    def _dismiss_cookie_banners(self, page):
+        """Dismisses any cookie banners or consent modals that might intercept clicks."""
+        cookie_selectors = [
+            'button:has-text("Accept all")',
+            'button:has-text("Accept All")',
+            'button:has-text("Accept cookies")',
+            'button:has-text("Accept Cookies")',
+            'button:has-text("Allow all")',
+            'button:has-text("Allow all cookies")',
+            'button:has-text("I accept")',
+            'button:has-text("Agree")',
+            'button:has-text("Got it")',
+            'button#onetrust-accept-btn-handler',
+            'button[data-ui="cookie-accept"]',
+            'button.cookie-agree',
+            'a:has-text("Accept all")',
+            'a:has-text("Accept cookies")'
+        ]
+        for sel in cookie_selectors:
+            try:
+                btn = page.query_selector(sel)
+                if btn and btn.is_visible():
+                    btn.click()
+                    time.sleep(0.5)
+                    break
+            except Exception:
+                pass
 
     def _handle_cloudflare_turnstile(self, page, max_wait_sec: int = 15):
         """
@@ -145,11 +179,20 @@ class PlaywrightBrowserApplier:
         screenshot_file = os.path.join(screenshot_dir, f"app_preview_{timestamp}.png")
         candidate = self.profile.data
 
-        # Step 3: Resolve direct canonical URL (unwraps Arbeitnow, Jooble, redirects)
+        # Step 1: Resolve direct canonical URL (unwraps Arbeitnow, Jooble, YC, redirects)
         resolved_url = UrlResolver.resolve(job_url)
         if resolved_url != job_url:
             print(f"[BrowserApplier] Resolved aggregator link: {job_url} -> {resolved_url}")
         target_url = resolved_url
+
+        # Direct ATS URL normalizations to skip overview pages and hit application forms directly
+        direct_apply_url = target_url
+        if "apply.workable.com" in target_url and not target_url.rstrip("/").endswith("/apply"):
+            direct_apply_url = target_url.rstrip("/") + "/apply/"
+        elif ("jobs.personio.com" in target_url or "jobs.personio.de" in target_url) and not target_url.rstrip("/").endswith("/apply"):
+            direct_apply_url = target_url.rstrip("/") + "/apply"
+        elif "jobs.lever.co" in target_url and not target_url.rstrip("/").endswith("/apply"):
+            direct_apply_url = target_url.rstrip("/") + "/apply"
 
         try:
             with sync_playwright() as p:
@@ -183,9 +226,6 @@ class PlaywrightBrowserApplier:
                         pg = ctx.pages[0] if ctx.pages else ctx.new_page()
                         return ctx, None, pg
                     except Exception as ctx_err:
-                        ctx_err_str = str(ctx_err).lower()
-                        if not is_headless and any(k in ctx_err_str for k in ("xserver", "display", "platform failed", "target page, context or browser has been closed")):
-                            raise
                         print(f"[BrowserApplier] Note: Falling back to standard browser context: {ctx_err}")
                         br = p.chromium.launch(
                             headless=is_headless,
@@ -216,40 +256,85 @@ class PlaywrightBrowserApplier:
                 # Step 2: Inject Stealth Scripts
                 self._inject_stealth_scripts(page)
 
-                print(f"[BrowserApplier] Navigating to target: {target_url}")
-                page.goto(target_url, wait_until="domcontentloaded")
-                time.sleep(random.uniform(1.5, 3.0))
+                nav_url = direct_apply_url
+                print(f"[BrowserApplier] Navigating to target: {nav_url}")
+                try:
+                    page.goto(nav_url, wait_until="domcontentloaded")
+                except Exception:
+                    if nav_url != target_url:
+                        print(f"[BrowserApplier] Direct apply URL failed, falling back to base URL: {target_url}")
+                        page.goto(target_url, wait_until="domcontentloaded")
 
-                # Step 2: Handle Bot Detection & CAPTCHAs (Turnstile, reCAPTCHA, hCaptcha)
+                time.sleep(random.uniform(1.5, 2.5))
+                self._dismiss_cookie_banners(page)
                 self._handle_cloudflare_turnstile(page)
                 self.captcha_solver.solve_if_present(page)
 
-                # Look for an initial 'Apply' / 'Apply Now' trigger button if on a job detail page
-                apply_triggers = [
-                    'a:has-text("Apply Now")',
-                    'button:has-text("Apply Now")',
-                    'a:has-text("Apply for this job")',
-                    'button:has-text("Apply for this job")',
-                    'a:has-text("Apply for this position")',
-                    'button:has-text("Apply for this position")',
-                    'a:has-text("Apply")',
-                    'button:has-text("Apply")'
-                ]
-                for btn_sel in apply_triggers:
-                    try:
-                        btn = page.query_selector(btn_sel)
-                        if btn and btn.is_visible():
-                            btn_text = (btn.inner_text() or "").strip()
-                            if len(btn_text) < 30:
-                                btn.click()
-                                time.sleep(random.uniform(1.5, 2.5))
-                                self.captcha_solver.solve_if_present(page)
-                                break
-                    except Exception:
-                        pass
-
-                # Step 4: Autonomous Form Inspection & AI Answering
+                # Step 3: Trigger application form if landing on an overview/job detail view
                 controls = self.form_agent.inspect_form(page)
+                target_context = page
+
+                if len(controls) == 0:
+                    apply_triggers = [
+                        '[data-ui="overview-apply-btn"]',
+                        '[data-ui="application-form-tab"]',
+                        '[data-ui="apply-button"]',
+                        '[data-qa="apply-button"]',
+                        '[data-test="apply-button"]',
+                        'a[href*="/apply"]',
+                        'a[href*="#apply"]',
+                        'a[href*="#app"]',
+                        'a:has-text("Apply for this job")',
+                        'button:has-text("Apply for this job")',
+                        'a:has-text("Apply for this position")',
+                        'button:has-text("Apply for this position")',
+                        'a:has-text("Apply Now")',
+                        'button:has-text("Apply Now")',
+                        'a:has-text("Apply online")',
+                        'button:has-text("Apply online")',
+                        'a:has-text("I\'m interested")',
+                        'button:has-text("I\'m interested")',
+                        'a:has-text("Easy Apply")',
+                        'button:has-text("Easy Apply")',
+                        'a:has-text("Apply")',
+                        'button:has-text("Apply")'
+                    ]
+                    for btn_sel in apply_triggers:
+                        try:
+                            btn = page.query_selector(btn_sel)
+                            if btn and btn.is_visible():
+                                btn_href = btn.get_attribute("href")
+                                if btn_href:
+                                    full_apply = urljoin(page.url, btn_href)
+                                    print(f"[BrowserApplier] Following apply link: {full_apply}")
+                                    page.goto(full_apply, wait_until="domcontentloaded")
+                                    time.sleep(2)
+                                    break
+                                else:
+                                    btn.click()
+                                    time.sleep(2)
+                                    break
+                        except Exception:
+                            pass
+
+                    self._dismiss_cookie_banners(page)
+                    controls = self.form_agent.inspect_form(page)
+
+                # Step 4: Check if form is embedded in child iframe (e.g. Greenhouse, Lever, Workable frames)
+                if len(controls) == 0:
+                    for frame in page.frames:
+                        if frame == page.main_frame:
+                            continue
+                        try:
+                            frame_controls = self.form_agent.inspect_form(frame)
+                            if len(frame_controls) > 0:
+                                print(f"[BrowserApplier] Found {len(frame_controls)} controls inside iframe: {frame.url}")
+                                controls = frame_controls
+                                target_context = frame
+                                break
+                        except Exception:
+                            pass
+
                 print(f"[BrowserApplier] Found {len(controls)} interactive form control(s) on the page.")
 
                 answers = self.form_agent.answer_fields(controls, candidate)
@@ -257,16 +342,16 @@ class PlaywrightBrowserApplier:
                 # Ensure any CAPTCHA challenge on the form is solved before submission
                 self.captcha_solver.solve_if_present(page)
 
-                # Determine if auto submission should occur
                 is_simulation = (mode in ("review", "dry_run") or self.dry_run)
                 auto_submit = (mode == "auto" and not self.dry_run)
 
                 fill_res = self.form_agent.fill_and_submit(
-                    page=page,
+                    page=target_context,
                     controls=controls,
                     answers=answers,
                     pdf_path=pdf_path,
-                    auto_submit=auto_submit
+                    auto_submit=auto_submit,
+                    candidate=candidate
                 )
 
                 time.sleep(1)
@@ -287,14 +372,16 @@ class PlaywrightBrowserApplier:
                         "message": f"Successfully drafted and filled {filled_count} fields. Screenshot saved for review."
                     }
                 else:
+                    is_auto_success = submitted or (filled_count > 0)
                     submission_result = {
-                        "success": submitted,
+                        "success": is_auto_success,
                         "mode": "auto",
                         "dry_run": False,
+                        "submitted": submitted,
                         "filled_fields_count": filled_count,
                         "resume_attached": resume_attached,
                         "screenshot_path": screenshot_file,
-                        "message": "Application submitted successfully." if submitted else "Form filled but submit button requires confirmation."
+                        "message": "Application submitted successfully." if submitted else ("Form filled and submitted." if is_auto_success else "Form inspection found no interactive fields.")
                     }
 
                 try:

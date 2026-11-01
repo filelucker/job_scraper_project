@@ -145,7 +145,7 @@ class TestAutoApplyPipeline(unittest.TestCase):
         }
         with patch.object(dispatcher.browser_applier, "apply", return_value=mock_browser_res):
             res = dispatcher.process_job(web_job)
-            self.assertEqual(res["status"], "Drafted (Web Form Filled)") # dry_run mode yields drafted
+            self.assertEqual(res["status"], "Drafted (Web Form Filled)")
             self.assertTrue(res["success"])
 
         # Test sheets router records timestamp for applied/drafted jobs
@@ -175,6 +175,55 @@ class TestAutoApplyPipeline(unittest.TestCase):
             self.assertEqual(row[8], "Applied (Web Portal)")
             self.assertTrue(len(row[9]) > 0)
             self.assertIn("BST", row[9])
+
+    def test_7_auto_apply_escalation_and_radio_answering(self):
+        from unittest.mock import MagicMock, patch
+        from services.form_agent import FormAgent
+
+        # 1. Test FormAgent radio and required checkbox answers
+        agent = FormAgent()
+        candidate = {
+            "first_name": "Md",
+            "last_name": "Moniruzzaman",
+            "work_authorization": {"requires_sponsorship": True, "authorized_in_us": False}
+        }
+        controls = [
+            {"kind": "radio", "label": "Do you now or in the future require visa sponsorship?", "value": "Yes", "selector": "#sponsor_yes", "required": True},
+            {"kind": "radio", "label": "Do you now or in the future require visa sponsorship?", "value": "No", "selector": "#sponsor_no", "required": True},
+            {"kind": "checkbox", "label": "I agree to Candidate Privacy Policy and Terms", "selector": "#privacy_check", "required": True}
+        ]
+        answers = agent.answer_fields(controls, candidate)
+        self.assertTrue(answers.get("#sponsor_yes"))
+        self.assertFalse(answers.get("#sponsor_no"))
+        self.assertTrue(answers.get("#privacy_check"))
+
+        # 2. Test AutoApplyDispatcher in mode="auto" produces "Applied (Web Portal)"
+        dispatcher = AutoApplyDispatcher(mode="auto")
+        lever_job = {
+            "Title": "Senior Android Engineer",
+            "Company": "TestCo",
+            "URL": "https://jobs.lever.co/testco/12345678-abcd-1234-abcd-1234567890ab",
+            "Location": "Remote"
+        }
+        # Simulate Lever API failure escalating to successful browser applier
+        with patch.object(dispatcher.lever_applier, "apply", return_value={"success": False, "error": "403 Cloudflare"}), \
+             patch.object(dispatcher.browser_applier, "apply", return_value={"success": True, "submitted": True, "filled_fields_count": 5}):
+            res = dispatcher.process_job(lever_job)
+            self.assertEqual(res["status"], "Applied (Web Portal)")
+            self.assertTrue(res["success"])
+
+        # 3. Test Greenhouse API failure escalating to browser applier in mode="auto"
+        gh_job = {
+            "Title": "Android Engineer",
+            "Company": "Reddit",
+            "URL": "https://job-boards.greenhouse.io/reddit/jobs/8127002",
+            "Location": "Remote"
+        }
+        with patch.object(dispatcher.greenhouse_applier, "apply", return_value={"success": False, "error": "400 Bad Request"}), \
+             patch.object(dispatcher.browser_applier, "apply", return_value={"success": True, "submitted": True, "filled_fields_count": 6}):
+            gh_res = dispatcher.process_job(gh_job)
+            self.assertEqual(gh_res["status"], "Applied (Web Portal)")
+            self.assertTrue(gh_res["success"])
 
 if __name__ == "__main__":
     unittest.main()

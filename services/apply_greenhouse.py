@@ -92,6 +92,50 @@ class GreenhouseApplier:
             "urls[Portfolio]": candidate_data.get("urls", {}).get("portfolio", "")
         }
 
+        # Dynamically answer Greenhouse custom questions if returned by API schema
+        if questions_data and isinstance(questions_data.get("questions"), list):
+            for q in questions_data["questions"]:
+                q_label = (q.get("label") or "").strip().lower()
+                q_required = q.get("required", False)
+                fields = q.get("fields", [])
+                for fld in fields:
+                    f_name = fld.get("name")
+                    f_type = fld.get("type")
+                    f_values = fld.get("values", [])
+                    if not f_name or f_name in ("resume", "resume_text", "cover_letter", "cover_letter_text"):
+                        continue
+                    if f_name in payload:
+                        continue
+
+                    # Answer based on question semantics
+                    if any(k in q_label for k in ["how did you hear", "source", "referral"]):
+                        payload[f_name] = "LinkedIn / Career Site"
+                    elif any(k in q_label for k in ["current company", "most recent company", "previous company"]):
+                        payload[f_name] = "Self / Previous Experience"
+                    elif any(k in q_label for k in ["sponsor", "visa"]):
+                        if f_type == "multi_value_single_select" and f_values:
+                            yes_val = next((v["value"] for v in f_values if "yes" in str(v.get("label", "")).lower()), f_values[0]["value"])
+                            payload[f_name] = yes_val
+                        else:
+                            payload[f_name] = "Yes"
+                    elif any(k in q_label for k in ["authorized", "authorization", "eligible to work"]):
+                        if f_type == "multi_value_single_select" and f_values:
+                            no_val = next((v["value"] for v in f_values if "no" in str(v.get("label", "")).lower()), f_values[-1]["value"])
+                            payload[f_name] = no_val
+                        else:
+                            payload[f_name] = "No"
+                    elif any(k in q_label for k in ["agree", "privacy", "consent", "terms", "policy", "acknowledge"]):
+                        if f_type == "multi_value_single_select" and f_values:
+                            agree_val = next((v["value"] for v in f_values if "agree" in str(v.get("label", "")).lower() or "yes" in str(v.get("label", "")).lower()), f_values[0]["value"])
+                            payload[f_name] = agree_val
+                        else:
+                            payload[f_name] = "I agree"
+                    elif q_required:
+                        if f_type == "multi_value_single_select" and f_values:
+                            payload[f_name] = f_values[0]["value"]
+                        elif f_type in ("input_text", "textarea"):
+                            payload[f_name] = "N/A"
+
         if cover_letter:
             payload["cover_letter_text"] = cover_letter
 
