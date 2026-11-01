@@ -45,7 +45,9 @@ from handlers import (
     WorkdayHandler, WorkableHandler, SmartRecruitersHandler, JobhiveAdapterHandler,
     AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler,
     ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler,
-    WellfoundHandler
+    WellfoundHandler,
+    RemotiveHandler, HimalayasHandler, JobicyHandler,
+    WorkingNomadsHandler, WeWorkRemotelyHandler
 )
 from handlers.email_extractor import JobEmailExtractor
 from routers import TelegramRouter, GoogleSheetsRouter, EmailRouter
@@ -233,6 +235,16 @@ def fetch_board(company_name: str, board_config: dict):
             countries=[{"indeed_domain": dom} for dom in INDEED_GLOBAL_DOMAINS],
             compound_rules=COMPOUND_RULES
         )
+    elif ats_type == "remotive":
+        handler = RemotiveHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "himalayas":
+        handler = HimalayasHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "jobicy":
+        handler = JobicyHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "workingnomads":
+        handler = WorkingNomadsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "weworkremotely":
+        handler = WeWorkRemotelyHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "wellfound":
         handler = WellfoundHandler(
             company_name,

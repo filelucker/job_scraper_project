@@ -10,7 +10,7 @@ Matches and application statuses are synced in real time to **Google Sheets** an
 
 - 🧩 **Comprehensive Multi-ATS & Aggregator Network**:
   - **Native ATS APIs**: Greenhouse, Lever, Ashby, Workday, Workable, SmartRecruiters.
-  - **Job Platforms & Curated Boards**: LinkedIn (Apify), Indeed (Apify), Arbeitnow, WeAreDevelopers, Relocate.me, FlexJobs, Adzuna, Jooble.
+  - **Job Platforms & Curated Boards**: Remotive, Himalayas, Jobicy, Working Nomads, We Work Remotely, Arbeitnow, WeAreDevelopers, Relocate.me, FlexJobs, Adzuna, Jooble, Y Combinator, LinkedIn, Indeed.
   - **Jobhive Adapter Integration**: Extends coverage to Breezy, BambooHR, Personio, Rippling, BuiltIn, Wanted (APAC), Programathor, and hundreds more.
   - **Fallback XML/RSS Handler**: Gracefully consumes custom company RSS/XML feeds.
 - 🎯 **Advanced Compound & Context Matching**:
@@ -59,6 +59,11 @@ job_scraper_project/
 │   ├── smartrecruiters.py          # SmartRecruiters postings API scraper
 │   ├── linkedin.py                 # LinkedIn scraper via Apify
 │   ├── indeed.py                   # Indeed scraper via Apify
+│   ├── remotive.py                 # Remotive Developer API scraper
+│   ├── himalayas.py                # Himalayas REST API scraper
+│   ├── jobicy.py                   # Jobicy Remote Engineering API scraper
+│   ├── workingnomads.py            # Working Nomads Dev API scraper
+│   ├── weworkremotely.py           # We Work Remotely RSS feed scraper
 │   ├── arbeitnow.py                # Arbeitnow tech board scraper
 │   ├── wearedevelopers.py          # WeAreDevelopers scraper
 │   ├── relocateme.py               # Relocate.me RSS scraper
@@ -86,7 +91,7 @@ job_scraper_project/
 │   └── resume_template.tex         # Master LaTeX CV template
 ├── data/
 │   └── candidate_profile.json      # Structured candidate background, skills, and answers
-└── tests/                          # Comprehensive unit test suite (37+ tests)
+└── tests/                          # Comprehensive unit test suite (45+ tests)
 ```
 
 ---

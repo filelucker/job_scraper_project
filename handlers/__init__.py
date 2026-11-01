@@ -17,11 +17,18 @@ from handlers.wearedevelopers import WeAreDevelopersHandler
 from handlers.germantechjobs import GermanTechJobsHandler
 from handlers.relocateme import RelocateMeHandler
 from handlers.wellfound import WellfoundHandler
+from handlers.remotive import RemotiveHandler
+from handlers.himalayas import HimalayasHandler
+from handlers.jobicy import JobicyHandler
+from handlers.workingnomads import WorkingNomadsHandler
+from handlers.weworkremotely import WeWorkRemotelyHandler
 
 __all__ = [
     "BaseHandler", "Job", "GreenhouseHandler", "LeverHandler", "FallbackHandler",
     "AshbyHandler", "WorkdayHandler", "WorkableHandler", "SmartRecruitersHandler",
     "JobhiveAdapterHandler", "AdzunaHandler", "JoobleHandler", "FlexjobsHandler",
     "LinkedInHandler", "IndeedHandler", "ArbeitnowHandler", "WeAreDevelopersHandler",
-    "GermanTechJobsHandler", "RelocateMeHandler", "WellfoundHandler"
+    "GermanTechJobsHandler", "RelocateMeHandler", "WellfoundHandler",
+    "RemotiveHandler", "HimalayasHandler", "JobicyHandler", "WorkingNomadsHandler",
+    "WeWorkRemotelyHandler"
 ]

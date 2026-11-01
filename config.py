@@ -2806,20 +2806,27 @@ COMPANY_BOARDS = {
     'Zus Health (2)': {'ats': 'ashby', 'token': 'zus-health'},
     'Zwift': {'ats': 'greenhouse', 'token': 'zwift'},
 
-    # --- Aggregators & Global Job Boards (14) ---
+    'Mistral AI': {'ats': 'lever', 'token': 'mistral'},
+    'Trade Republic': {'ats': 'greenhouse', 'token': 'traderepublic'},
+
+    # --- Aggregators & Global Remote Platforms ---
     'Adzuna': {'ats': 'adzuna', 'token': '*'},
     'Arbeitnow': {'ats': 'arbeitnow', 'token': '*'},
     'BuiltIn': {'ats': 'builtin', 'token': '*'},
     'Get on Board (LATAM)': {'ats': 'getonbrd', 'token': '*'},
+    'Himalayas': {'ats': 'himalayas', 'token': '*'},
     'Indeed': {'ats': 'indeed', 'token': '*'},
+    'Jobicy': {'ats': 'jobicy', 'token': '*'},
     'Jooble': {'ats': 'jooble', 'token': '*'},
     'LinkedIn': {'ats': 'linkedin', 'token': '*'},
     'Relocate.me': {'ats': 'relocateme', 'token': '*'},
+    'Remotive': {'ats': 'remotive', 'token': '*'},
     'RemoteOK': {'ats': 'remoteok', 'token': '*'},
     'USAJobs (US)': {'ats': 'usajobs', 'token': 'usajobs'},
-    'We Work Remotely': {'ats': 'fallback', 'token': 'https://weworkremotely.com/remote-jobs.rss'},
+    'We Work Remotely': {'ats': 'weworkremotely', 'token': '*'},
     'WeAreDevelopers': {'ats': 'wearedevelopers', 'token': '*'},
     'Wellfound': {'ats': 'wellfound', 'token': '*'},
+    'Working Nomads': {'ats': 'workingnomads', 'token': '*'},
     'Y Combinator': {'ats': 'ycombinator', 'token': '*'},
 }
 

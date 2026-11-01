@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone, timedelta
-from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler, ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler, WellfoundHandler
+from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler, ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler, WellfoundHandler, RemotiveHandler, HimalayasHandler, JobicyHandler, WorkingNomadsHandler, WeWorkRemotelyHandler
 from handlers.base import BaseHandler
 
 class DummyHandler(BaseHandler):
@@ -612,6 +612,91 @@ class TestPipeline(unittest.TestCase):
         self.assertTrue(hasattr(run_pipeline, "timedelta"))
         self.assertTrue(hasattr(run_pipeline, "datetime"))
         self.assertTrue(hasattr(run_pipeline, "timezone"))
+
+
+    def test_remotive_parsing(self):
+        handler = RemotiveHandler("Remotive", "*", ["Full-Stack", "Developer"], 24)
+        raw_job = {
+            "title": "Full-Stack Developer",
+            "company_name": "Fluence International",
+            "candidate_required_location": "Worldwide",
+            "url": "https://remotive.com/remote-jobs/123",
+            "publication_date": "2026-10-29T18:22:41",
+            "description": "We offer visa sponsorship and relocation.",
+            "tags": ["full-stack", "react", "python"]
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Fluence International")
+        self.assertEqual(job.title, "Full-Stack Developer")
+        self.assertIn("Remote", job.location)
+        self.assertTrue(job.has_visa_sponsorship)
+        self.assertTrue(job.has_relocation)
+
+    def test_himalayas_parsing(self):
+        handler = HimalayasHandler("Himalayas", "*", ["Product Engineer"], 24)
+        raw_job = {
+            "title": "Product Engineer - AI Finance",
+            "companyName": "Bjak",
+            "applicationLink": "https://himalayas.app/companies/bjak/jobs/123",
+            "location": "Worldwide",
+            "pubDate": 1793523982,
+            "description": "AI Finance product engineer",
+            "categories": ["Engineering", "AI"]
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Bjak")
+        self.assertEqual(job.title, "Product Engineer - AI Finance")
+        self.assertEqual(job.url, "https://himalayas.app/companies/bjak/jobs/123")
+
+    def test_jobicy_parsing(self):
+        handler = JobicyHandler("Jobicy", "*", ["AI Engineer"], 24)
+        raw_job = {
+            "jobTitle": "Senior AI Engineer",
+            "companyName": "WorkWave",
+            "url": "https://jobicy.com/jobs/456",
+            "jobGeo": "UK",
+            "pubDate": "2026-11-01T06:51:42+00:00",
+            "jobDescription": "Build agentic platforms with visa sponsorship."
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "WorkWave")
+        self.assertEqual(job.title, "Senior AI Engineer")
+        self.assertIn("Remote (UK)", job.location)
+        self.assertTrue(job.has_visa_sponsorship)
+
+    def test_workingnomads_parsing(self):
+        handler = WorkingNomadsHandler("WorkingNomads", "*", ["Swift Developer"], 24)
+        raw_job = {
+            "title": "Senior Swift & SwiftUI Developer",
+            "company_name": "Lemon.io",
+            "url": "https://www.workingnomads.com/job/go/789",
+            "location_requirement": "Global",
+            "pub_date": "2026-10-29T09:50:51-04:00",
+            "description": "Swift and SwiftUI iOS development",
+            "tags": [{"name": "iOS"}, {"name": "Swift"}]
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Lemon.io")
+        self.assertEqual(job.title, "Senior Swift & SwiftUI Developer")
+        self.assertIn("Remote (Global)", job.location)
+
+    def test_weworkremotely_parsing(self):
+        handler = WeWorkRemotelyHandler("WeWorkRemotely", "*", ["Deployment Strategist"], 24)
+        raw_job = {
+            "raw_title": "Databricks: Deployment Strategist",
+            "url": "https://weworkremotely.com/remote-jobs/101",
+            "pub_date": "Wed, 14 Oct 2026 07:31:00 +0000",
+            "description": "Customer deployment engineer"
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Databricks")
+        self.assertEqual(job.title, "Deployment Strategist")
+        self.assertEqual(job.url, "https://weworkremotely.com/remote-jobs/101")
 
 if __name__ == "__main__":
     unittest.main()
