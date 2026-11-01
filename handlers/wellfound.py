@@ -128,3 +128,4 @@ class WellfoundHandler(BaseHandler):
             url=url.strip(),
             posted_time=posted_time
         )
+
