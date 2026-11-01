@@ -23,7 +23,7 @@ class TelegramRouter:
             text = text.replace(char, f"\\{char}")
         return text
 
-    def format_jobs_message(self, jobs: List[Dict[str, Any]], lookback_hours: int = 24) -> str:
+    def format_jobs_message(self, jobs: List[Dict[str, Any]], lookback_hours: int = 6) -> str:
         """
         Format a list of jobs using the clean scannable layout
         with an explicit status indicator.

@@ -30,15 +30,15 @@ class TestPipeline(unittest.TestCase):
         self.assertFalse(handler.matches_keywords(None))
 
     def test_lookback_verification(self):
-        handler = DummyHandler("TestCo", "token", [], lookback_hours=24)
+        handler = DummyHandler("TestCo", "token", [], lookback_hours=6)
         
         # Within lookback (UTC)
         now_utc = datetime.now(timezone.utc)
         self.assertTrue(handler.is_within_lookback(now_utc - timedelta(hours=5)))
-        self.assertTrue(handler.is_within_lookback(now_utc - timedelta(hours=23)))
+        self.assertTrue(handler.is_within_lookback(now_utc - timedelta(hours=5)))
         
         # Outside lookback
-        self.assertFalse(handler.is_within_lookback(now_utc - timedelta(hours=25)))
+        self.assertFalse(handler.is_within_lookback(now_utc - timedelta(hours=7)))
         self.assertFalse(handler.is_within_lookback(now_utc + timedelta(hours=2))) # future date
         
         # Naive datetime assume UTC
