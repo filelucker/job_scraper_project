@@ -93,7 +93,7 @@ class GoogleSheetsRouter:
             for row in records:
                 status = str(row.get("Application Status", "")).strip()
                 applied_at = str(row.get("Applied At", "")).strip()
-                if ("Apply via" in status or "Pending" in status) and not applied_at:
+                if ("Apply via" in status or "Pending" in status or "Draft" in status):
                     unapplied.append({
                         "Company": row.get("Company", ""),
                         "Title": row.get("Title", ""),
