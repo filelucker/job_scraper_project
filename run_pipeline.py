@@ -430,6 +430,9 @@ def main():
             except Exception as init_err:
                 print(f"[Auto-Apply] Error initializing dispatcher: {init_err}", file=sys.stderr)
                 dispatcher = None
+                for job in jobs_to_apply:
+                    job["Application Status"] = f"Failed (Dispatcher Init: {str(init_err)[:60]})"
+                    job["Status"] = f"Failed (Dispatcher Init: {str(init_err)[:60]})" 
 
             if dispatcher:
                 bst_tz = timezone(timedelta(hours=6))
@@ -507,10 +510,34 @@ def main():
 
                     except Exception as apply_err:
                         print(f"[Auto-Apply] Error processing application for {company}: {apply_err}", file=sys.stderr)
-                        err_status = f"Failed ({apply_err})"
+                        clean_err = str(apply_err).replace('\n', ' ')
+                        if len(clean_err) > 80:
+                            clean_err = clean_err[:77] + "..."
+                        err_status = f"Failed ({clean_err})"
+                        timestamp = datetime.now(bst_tz).strftime("%Y-%m-%d %I:%M:%S %p BST")
+
                         job["Status"] = err_status
                         job["status"] = err_status
                         job["Application Status"] = err_status
+                        job["Applied At"] = timestamp
+
+                        # Put error / failed status directly into Google Sheets immediately
+                        if sheets_active and GOOGLE_CREDENTIALS_JSON and url:
+                            try:
+                                if url in existing_urls:
+                                    sheets_router.update_application_status(
+                                        job_url=url,
+                                        status=err_status,
+                                        contact_email=job.get("Contact Email", ""),
+                                        applied_at=timestamp
+                                    )
+                                else:
+                                    sheets_router.append_jobs([job])
+                                    existing_urls.append(url)
+                                    appended_in_run_urls.add(url)
+                            except Exception as sync_err:
+                                print(f"[Google Sheets Router] Error syncing failed job {company}: {sync_err}")
+
                         if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
                             try:
                                 tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
@@ -528,6 +555,9 @@ def main():
             print("\n[Auto-Apply] All matched jobs were already processed in previous runs. Skipping redundant auto-apply.")
         elif jobs_to_apply and not AUTO_APPLY_ENABLED:
             print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/application.")
+            for job in jobs_to_apply:
+                job["Application Status"] = "Unapplied (Auto-Apply Disabled)"
+                job["Status"] = "Unapplied (Auto-Apply Disabled)" 
 
         # --- 3. Optional: Reprocess existing unapplied jobs in Google Sheets ---
         reprocess_enabled = os.getenv("AUTO_APPLY_REPROCESS_UNAPPLIED", "false").lower() in ("true", "1")
@@ -554,7 +584,16 @@ def main():
                                 contact_email=ujob.get("Contact Email", "")
                             )
                         except Exception as e:
+                            clean_err = str(e).replace('\n', ' ')[:60]
                             print(f"[Auto-Apply] Failed reprocessing sheet job {u_company}: {e}")
+                            try:
+                                sheets_router.update_application_status(
+                                    job_url=u_url,
+                                    status=f"Failed ({clean_err})",
+                                    contact_email=ujob.get("Contact Email", "")
+                                )
+                            except Exception:
+                                pass
             except Exception as e:
                 print(f"[Auto-Apply] Error checking unapplied jobs in sheet: {e}")
 

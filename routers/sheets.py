@@ -200,7 +200,7 @@ class GoogleSheetsRouter:
                 contact_email = job.get("Contact Email") or job.get("email", "")
                 status = job.get("Application Status") or job.get("Status") or job.get("status") or job.get("initial_status", "Pending")
                 applied_at = job.get("Applied At") or job.get("applied_at") or ""
-                if not applied_at and ("Applied" in status or "Drafted" in status):
+                if not applied_at and any(k in status.lower() for k in ("applied", "draft", "fail", "error", "manual", "apply via")):
                     applied_at = self._current_bst_timestamp()
 
                 rows_to_append.append([
