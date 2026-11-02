@@ -101,3 +101,4 @@ class TheMuseHandler(BaseHandler):
             has_visa_sponsorship=has_visa,
             has_relocation=has_relocation
         )
+
