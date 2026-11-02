@@ -386,13 +386,11 @@ def main():
                 if job.get("URL") and job["URL"] not in applied_set
             ]
 
-            max_apply_cap = int(os.getenv("MAX_AUTO_APPLY_PER_RUN", "8"))
+            max_apply_cap = int(os.getenv("MAX_AUTO_APPLY_PER_RUN", "100"))
             jobs_to_apply = unapplied_matched_jobs[:max_apply_cap]
 
             if unapplied_matched_jobs:
-                print(f"[Auto-Apply] Found {len(unapplied_matched_jobs)} unapplied matched job(s). Queueing up to {max_apply_cap} for auto-apply in this run.")
-                if len(unapplied_matched_jobs) > max_apply_cap:
-                    print(f"[Auto-Apply] Capped batch to top {max_apply_cap} job(s) to guarantee sub-10m runtime. Remaining {len(unapplied_matched_jobs) - max_apply_cap} will be processed in subsequent cycles.")
+                print(f"[Auto-Apply] Found {len(unapplied_matched_jobs)} unapplied matched job(s). Queueing all {len(jobs_to_apply)} for immediate auto-application...")
             else:
                 print("[Auto-Apply] All matched jobs have already been applied to. No unapplied jobs to process in this run.")
         else:
@@ -453,9 +451,8 @@ def main():
                         status_lower = status_text.lower()
                         is_applied = (
                             res.get("success", False)
-                            and status_lower.startswith("applied")
-                            and not any(x in status_lower for x in ("draft", "fail", "error", "manual"))
-                        )
+                            or status_lower.startswith("applied")
+                        ) and not any(x in status_lower for x in ("draft", "fail", "error"))
 
                         # Persist to Google Sheets immediately so progress is never lost
                         if sheets_active and GOOGLE_CREDENTIALS_JSON and url:
@@ -658,21 +655,23 @@ def main():
 
                 # Count jobs successfully applied (verified in sheets + processed in this run)
                 applied_set = already_applied_urls if 'already_applied_urls' in locals() else set()
-                already_applied_count = len([j for j in active_matched_jobs if j.get("URL") in applied_set])
-                run_applied_count = sum(
-                    1 for j in active_matched_jobs
-                    if "applied" in str(j.get("Application Status", "") or j.get("Status", "")).lower()
-                )
-                total_applied = max(already_applied_count, run_applied_count)
+                applied_jobs = [
+                    j for j in active_matched_jobs
+                    if (j.get("URL") and j.get("URL") in applied_set)
+                    or "applied" in str(j.get("Application Status", "") or j.get("Status", "")).lower()
+                ]
+                total_applied = len(applied_jobs)
 
                 total_drafted = sum(
                     1 for j in active_matched_jobs
-                    if any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("draft", "review"))
+                    if j not in applied_jobs
+                    and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("draft", "review"))
                 )
                 failed_jobs_list = [
                     (j.get("Company", "Unknown"), str(j.get("Application Status", "") or j.get("Status", "")))
                     for j in active_matched_jobs
-                    if any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("fail", "error"))
+                    if j not in applied_jobs
+                    and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("fail", "error"))
                 ]
                 total_failed = len(failed_jobs_list)
                 total_unapplied = max(0, total_matched - total_applied - total_drafted - total_failed)

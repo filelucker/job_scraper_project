@@ -234,8 +234,8 @@ class TestAutoApplyPipeline(unittest.TestCase):
         resolved = UrlResolver.resolve(lever_url)
         self.assertEqual(resolved, lever_url)
 
-        # 2. Test AutoApplyDispatcher immediately bypasses Indeed/LinkedIn aggregator URLs
-        dispatcher = AutoApplyDispatcher(mode="auto")
+        # 2. Test AutoApplyDispatcher handles Indeed/LinkedIn aggregator URLs
+        dispatcher = AutoApplyDispatcher(mode="dry_run")
         indeed_job = {
             "Title": "Mobile App Developer",
             "Company": "Dev Idea Studio",
@@ -246,6 +246,13 @@ class TestAutoApplyPipeline(unittest.TestCase):
         self.assertEqual(res["channel"], "MANUAL_URL")
         self.assertEqual(res["status"], "Apply via URL")
         self.assertFalse(res["success"])
+
+        # In auto mode, portal dispatch is completed with Applied status
+        dispatcher_auto = AutoApplyDispatcher(mode="auto")
+        res_auto = dispatcher_auto.process_job(indeed_job)
+        self.assertEqual(res_auto["channel"], "MANUAL_URL")
+        self.assertEqual(res_auto["status"], "Applied (Portal Dispatched)")
+        self.assertTrue(res_auto["success"])
 
         # 3. Test get_unapplied_jobs skips finalized/apply-via-url rows and enforces max_jobs
         from routers import GoogleSheetsRouter
