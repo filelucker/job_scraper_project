@@ -389,19 +389,14 @@ def main():
             new_jobs = [job for job in job_dicts if job["URL"] not in all_existing_urls]
             print(f"Identified {len(new_jobs)} new job(s) out of {len(job_dicts)} matched job(s).")
 
-            applied_set = already_applied_urls if 'already_applied_urls' in locals() else set()
-            unapplied_matched_jobs = [
-                job for job in job_dicts
-                if job.get("URL") and job["URL"] not in applied_set
-            ]
-
+            # Only queue newly added jobs for application in this run
             max_apply_cap = int(os.getenv("MAX_AUTO_APPLY_PER_RUN", "100"))
-            jobs_to_apply = unapplied_matched_jobs[:max_apply_cap]
+            jobs_to_apply = new_jobs[:max_apply_cap]
 
-            if unapplied_matched_jobs:
-                print(f"[Auto-Apply] Found {len(unapplied_matched_jobs)} unapplied matched job(s). Queueing all {len(jobs_to_apply)} for immediate auto-application...")
+            if jobs_to_apply:
+                print(f"[Auto-Apply] Found {len(new_jobs)} new job(s). Queueing all {len(jobs_to_apply)} for immediate auto-application...")
             else:
-                print("[Auto-Apply] All matched jobs have already been applied to. No unapplied jobs to process in this run.")
+                print("[Auto-Apply] No new jobs to apply to in this run.")
         else:
             print("No matches found. Skipping deduplication and export.")
 
@@ -438,6 +433,7 @@ def main():
 
             if dispatcher:
                 bst_tz = timezone(timedelta(hours=6))
+                appended_in_run_urls = set()
                 for job in jobs_to_apply:
                     company = job.get("Company", "Company")
                     title = job.get("Title", "Job")
@@ -476,6 +472,7 @@ def main():
                                 else:
                                     sheets_router.append_jobs([job])
                                     existing_urls.append(url)
+                                    appended_in_run_urls.add(url)
                                 if is_applied and 'already_applied_urls' in locals():
                                     already_applied_urls.add(url)
                             except Exception as sync_err:
@@ -562,12 +559,20 @@ def main():
                 print(f"[Auto-Apply] Error checking unapplied jobs in sheet: {e}")
 
         # --- 4. Route findings to Google Sheets (Bulk append with final status & dates) ---
-        if new_jobs and GOOGLE_CREDENTIALS_JSON and sheets_active:
-            print("\nExporting new matches to Google Sheets...")
+        already_synced = appended_in_run_urls if 'appended_in_run_urls' in locals() else set()
+        unappended_new_jobs = [
+            j for j in new_jobs
+            if j.get("URL") not in already_synced
+            and j.get("URL") not in existing_urls
+        ] if ('existing_urls' in locals()) else new_jobs
+
+        if unappended_new_jobs and GOOGLE_CREDENTIALS_JSON and sheets_active:
+            print(f"\nExporting {len(unappended_new_jobs)} remaining new matches to Google Sheets...")
             try:
-                sheets_success = sheets_router.append_jobs(new_jobs)
+                sheets_success = sheets_router.append_jobs(unappended_new_jobs)
                 if sheets_success:
-                    print(f"Google Sheets export of {len(new_jobs)} new job(s) completed successfully.")
+                    print(f"Google Sheets export of {len(unappended_new_jobs)} new job(s) completed successfully.")
+                    existing_urls.extend([j.get("URL") for j in unappended_new_jobs if j.get("URL")])
                 else:
                     print("Google Sheets export failed. Check logs for details.")
             except Exception as e:
@@ -662,28 +667,27 @@ def main():
                 total_matched = len(active_matched_jobs)
                 active_new_jobs = new_jobs if ('new_jobs' in locals() and new_jobs) else []
 
-                # Count jobs successfully applied (verified in sheets + processed in this run)
-                applied_set = already_applied_urls if 'already_applied_urls' in locals() else set()
-                applied_jobs = [
-                    j for j in active_matched_jobs
-                    if (j.get("URL") and j.get("URL") in applied_set)
-                    or "applied" in str(j.get("Application Status", "") or j.get("Status", "")).lower()
+                # Summary statistics based on the New Jobs Added in this run
+                total_new = len(active_new_jobs)
+                applied_new_jobs = [
+                    j for j in active_new_jobs
+                    if "applied" in str(j.get("Application Status", "") or j.get("Status", "")).lower()
                 ]
-                total_applied = len(applied_jobs)
+                total_applied = len(applied_new_jobs)
 
                 total_drafted = sum(
-                    1 for j in active_matched_jobs
-                    if j not in applied_jobs
+                    1 for j in active_new_jobs
+                    if j not in applied_new_jobs
                     and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("draft", "review"))
                 )
                 failed_jobs_list = [
                     (j.get("Company", "Unknown"), str(j.get("Application Status", "") or j.get("Status", "")))
-                    for j in active_matched_jobs
-                    if j not in applied_jobs
+                    for j in active_new_jobs
+                    if j not in applied_new_jobs
                     and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("fail", "error"))
                 ]
                 total_failed = len(failed_jobs_list)
-                total_unapplied = max(0, total_matched - total_applied - total_drafted - total_failed)
+                total_unapplied = max(0, total_new - total_applied - total_drafted - total_failed)
 
                 summary_msg = telegram_router.format_run_summary(
                     duration_seconds=duration_seconds,
