@@ -80,6 +80,27 @@ class GoogleSheetsRouter:
             print(f"[Google Sheets Router] Error fetching existing URLs: {e}")
             return []
 
+    def get_applied_urls(self) -> set:
+        """Fetch all URLs from the sheet where an application has already been submitted or completed."""
+        if not self.credentials_json:
+            return set()
+        try:
+            worksheet = self._get_worksheet()
+            if not worksheet:
+                return set()
+            records = worksheet.get_all_records()
+            applied_urls = set()
+            for row in records:
+                url = str(row.get("URL", "")).strip()
+                status = str(row.get("Application Status", "")).strip().lower()
+                applied_at = str(row.get("Applied At", "")).strip()
+                if url and (status.startswith("applied") or applied_at):
+                    applied_urls.add(url)
+            return applied_urls
+        except Exception as e:
+            print(f"[Google Sheets Router] Error fetching applied URLs: {e}")
+            return set()
+
     def get_unapplied_jobs(self, max_jobs: int = 5) -> List[Dict[str, Any]]:
         """
         Fetch rows that are explicitly pending or drafted for auto-application.

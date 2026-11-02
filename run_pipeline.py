@@ -355,8 +355,9 @@ def main():
                         worksheet_name=GOOGLE_WORKSHEET_NAME
                     )
                     existing_urls = sheets_router.get_existing_urls()
+                    already_applied_urls = sheets_router.get_applied_urls()
                     sheets_active = True
-                    print(f"Found {len(existing_urls)} job URLs already in Google Sheets.")
+                    print(f"Found {len(existing_urls)} job URLs already in Google Sheets ({len(already_applied_urls)} verified applied).")
                 except Exception as e:
                     print(f"[ERROR] Exception during Google Sheets check: {e}", file=sys.stderr)
             else:
@@ -379,12 +380,21 @@ def main():
             new_jobs = [job for job in job_dicts if job["URL"] not in all_existing_urls]
             print(f"Identified {len(new_jobs)} new job(s) out of {len(job_dicts)} matched job(s).")
 
-            # Only newly discovered listings should be queued for auto-application
-            # Existing listings have already been processed in prior runs
+            applied_set = already_applied_urls if 'already_applied_urls' in locals() else set()
+            unapplied_matched_jobs = [
+                job for job in job_dicts
+                if job.get("URL") and job["URL"] not in applied_set
+            ]
+
             max_apply_cap = int(os.getenv("MAX_AUTO_APPLY_PER_RUN", "8"))
-            jobs_to_apply = new_jobs[:max_apply_cap]
-            if len(new_jobs) > max_apply_cap:
-                print(f"[Auto-Apply] Capped auto-apply batch to top {max_apply_cap} new job(s) to guarantee sub-10m runtime. Remaining {len(new_jobs) - max_apply_cap} will be logged as Pending.")
+            jobs_to_apply = unapplied_matched_jobs[:max_apply_cap]
+
+            if unapplied_matched_jobs:
+                print(f"[Auto-Apply] Found {len(unapplied_matched_jobs)} unapplied matched job(s). Queueing up to {max_apply_cap} for auto-apply in this run.")
+                if len(unapplied_matched_jobs) > max_apply_cap:
+                    print(f"[Auto-Apply] Capped batch to top {max_apply_cap} job(s) to guarantee sub-10m runtime. Remaining {len(unapplied_matched_jobs) - max_apply_cap} will be processed in subsequent cycles.")
+            else:
+                print("[Auto-Apply] All matched jobs have already been applied to. No unapplied jobs to process in this run.")
         else:
             print("No matches found. Skipping deduplication and export.")
 
@@ -446,6 +456,24 @@ def main():
                             and status_lower.startswith("applied")
                             and not any(x in status_lower for x in ("draft", "fail", "error", "manual"))
                         )
+
+                        # Persist to Google Sheets immediately so progress is never lost
+                        if sheets_active and GOOGLE_CREDENTIALS_JSON and url:
+                            try:
+                                if url in existing_urls:
+                                    sheets_router.update_application_status(
+                                        job_url=url,
+                                        status=status_text,
+                                        contact_email=job.get("Contact Email", ""),
+                                        applied_at=timestamp
+                                    )
+                                else:
+                                    sheets_router.append_jobs([job])
+                                    existing_urls.append(url)
+                                if is_applied and 'already_applied_urls' in locals():
+                                    already_applied_urls.add(url)
+                            except Exception as sync_err:
+                                print(f"[Google Sheets Router] Error syncing job {company}: {sync_err}")
 
                         if is_applied:
                             print(f"[Auto-Apply] Successfully auto-applied to {company} ({title}) via {channel}. Suppressing Telegram PDF/draft notification as requested.")
@@ -624,12 +652,19 @@ def main():
                     bot_token=TELEGRAM_BOT_TOKEN,
                     chat_id=TELEGRAM_CHAT_ID
                 )
-                active_matched_jobs = jobs_to_apply if ('jobs_to_apply' in locals() and jobs_to_apply) else (job_dicts if 'job_dicts' in locals() else [])
+                active_matched_jobs = job_dicts if 'job_dicts' in locals() else []
+                total_matched = len(active_matched_jobs)
                 active_new_jobs = new_jobs if ('new_jobs' in locals() and new_jobs) else []
-                total_applied = sum(
+
+                # Count jobs successfully applied (verified in sheets + processed in this run)
+                applied_set = already_applied_urls if 'already_applied_urls' in locals() else set()
+                already_applied_count = len([j for j in active_matched_jobs if j.get("URL") in applied_set])
+                run_applied_count = sum(
                     1 for j in active_matched_jobs
                     if "applied" in str(j.get("Application Status", "") or j.get("Status", "")).lower()
                 )
+                total_applied = max(already_applied_count, run_applied_count)
+
                 total_drafted = sum(
                     1 for j in active_matched_jobs
                     if any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("draft", "review"))
@@ -640,7 +675,7 @@ def main():
                     if any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("fail", "error"))
                 ]
                 total_failed = len(failed_jobs_list)
-                total_unapplied = max(0, len(active_matched_jobs) - total_applied - total_drafted - total_failed)
+                total_unapplied = max(0, total_matched - total_applied - total_drafted - total_failed)
 
                 summary_msg = telegram_router.format_run_summary(
                     duration_seconds=duration_seconds,
