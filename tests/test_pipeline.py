@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone, timedelta
-from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler, ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler, WellfoundHandler, RemotiveHandler, HimalayasHandler, JobicyHandler, WorkingNomadsHandler, WeWorkRemotelyHandler
+from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler, ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler, WellfoundHandler, RemotiveHandler, HimalayasHandler, JobicyHandler, WorkingNomadsHandler, WeWorkRemotelyHandler, RemoteOKHandler, LandingJobsHandler, TheMuseHandler, HackerNewsHandler
 from handlers.base import BaseHandler
 
 class DummyHandler(BaseHandler):
@@ -697,6 +697,79 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(job.company, "Databricks")
         self.assertEqual(job.title, "Deployment Strategist")
         self.assertEqual(job.url, "https://weworkremotely.com/remote-jobs/101")
+
+
+    def test_remoteok_parsing(self):
+        handler = RemoteOKHandler("RemoteOK", "*", ["Flutter Developer"], 24)
+        raw_job = {
+            "position": "Senior Flutter Developer",
+            "company": "AppFlow Studio",
+            "url": "https://remoteok.com/remote-jobs/123",
+            "apply_url": "https://appflow.io/careers/apply",
+            "location": "Worldwide",
+            "date": "2026-11-01T12:00:00+00:00",
+            "description": "We offer visa sponsorship and relocation.",
+            "tags": ["flutter", "dart", "mobile"]
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "AppFlow Studio")
+        self.assertEqual(job.title, "Senior Flutter Developer")
+        self.assertEqual(job.url, "https://appflow.io/careers/apply")
+        self.assertIn("Remote", job.location)
+        self.assertTrue(job.has_visa_sponsorship)
+        self.assertTrue(job.has_relocation)
+
+    def test_landingjobs_parsing(self):
+        handler = LandingJobsHandler("LandingJobs", "*", ["Android"], 24)
+        raw_job = {
+            "title": "Android Platform Engineer",
+            "company_name": "Inscale",
+            "url": "https://landing.jobs/at/inscale/android-engineer",
+            "city": "Berlin",
+            "country_name": "Germany",
+            "remote": True,
+            "published_at": "2026-11-01T10:00:00.000Z",
+            "tags": ["Android", "Kotlin", "Visa Sponsorship"]
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Inscale")
+        self.assertEqual(job.title, "Android Platform Engineer")
+        self.assertIn("Remote", job.location)
+        self.assertTrue(job.has_visa_sponsorship)
+
+    def test_themuse_parsing(self):
+        handler = TheMuseHandler("TheMuse", "*", ["Android"], 24)
+        raw_job = {
+            "name": "Sr Software Engineer - Android",
+            "company": {"name": "Uber"},
+            "refs": {"landing_page": "https://www.themuse.com/jobs/uber/sr-android-engineer"},
+            "locations": [{"name": "San Francisco, CA"}, {"name": "Flexible / Remote"}],
+            "publication_date": "2026-10-30T15:00:00Z",
+            "contents": "<p>Build innovative mobile rider experiences.</p>",
+            "categories": [{"name": "Software Engineering"}],
+            "levels": [{"name": "Senior Level"}]
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Uber")
+        self.assertEqual(job.title, "Sr Software Engineer - Android")
+        self.assertEqual(job.url, "https://www.themuse.com/jobs/uber/sr-android-engineer")
+        self.assertIn("San Francisco", job.location)
+
+    def test_hackernews_parsing(self):
+        handler = HackerNewsHandler("HackerNews", "*", ["Mobile"], 24)
+        raw_job = {
+            "objectID": "50001801",
+            "created_at": "2026-10-02T16:00:00Z",
+            "comment_text": "NetBird | Lead Mobile Engineer | Berlin, Germany | Full-time https:&#x2F;&#x2F;netbird.io&#x2F;careers\n\nWe are hiring a Lead Mobile Engineer."
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "NetBird")
+        self.assertEqual(job.url, "https://netbird.io/careers")
+        self.assertEqual(job.location, "Berlin, Germany")
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,6 +22,10 @@ from handlers.himalayas import HimalayasHandler
 from handlers.jobicy import JobicyHandler
 from handlers.workingnomads import WorkingNomadsHandler
 from handlers.weworkremotely import WeWorkRemotelyHandler
+from handlers.remoteok import RemoteOKHandler
+from handlers.landingjobs import LandingJobsHandler
+from handlers.themuse import TheMuseHandler
+from handlers.hackernews import HackerNewsHandler
 
 __all__ = [
     "BaseHandler", "Job", "GreenhouseHandler", "LeverHandler", "FallbackHandler",
@@ -30,5 +34,6 @@ __all__ = [
     "LinkedInHandler", "IndeedHandler", "ArbeitnowHandler", "WeAreDevelopersHandler",
     "GermanTechJobsHandler", "RelocateMeHandler", "WellfoundHandler",
     "RemotiveHandler", "HimalayasHandler", "JobicyHandler", "WorkingNomadsHandler",
-    "WeWorkRemotelyHandler"
+    "WeWorkRemotelyHandler", "RemoteOKHandler", "LandingJobsHandler", "TheMuseHandler",
+    "HackerNewsHandler"
 ]

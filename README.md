@@ -59,6 +59,10 @@ job_scraper_project/
 │   ├── smartrecruiters.py          # SmartRecruiters postings API scraper
 │   ├── linkedin.py                 # LinkedIn scraper via Apify
 │   ├── indeed.py                   # Indeed scraper via Apify
+│   ├── remoteok.py                 # RemoteOK global remote API scraper
+│   ├── landingjobs.py              # Landing.jobs European & remote tech API scraper
+│   ├── themuse.py                  # The Muse tech & engineering public API scraper
+│   ├── hackernews.py               # Hacker News 'Who is Hiring' Algolia API scraper
 │   ├── remotive.py                 # Remotive Developer API scraper
 │   ├── himalayas.py                # Himalayas REST API scraper
 │   ├── jobicy.py                   # Jobicy Remote Engineering API scraper
@@ -91,7 +95,7 @@ job_scraper_project/
 │   └── resume_template.tex         # Master LaTeX CV template
 ├── data/
 │   └── candidate_profile.json      # Structured candidate background, skills, and answers
-└── tests/                          # Comprehensive unit test suite (45+ tests)
+└── tests/                          # Comprehensive unit test suite (50+ tests)
 ```
 
 ---

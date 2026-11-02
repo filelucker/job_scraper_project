@@ -47,7 +47,8 @@ from handlers import (
     ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler,
     WellfoundHandler,
     RemotiveHandler, HimalayasHandler, JobicyHandler,
-    WorkingNomadsHandler, WeWorkRemotelyHandler
+    WorkingNomadsHandler, WeWorkRemotelyHandler, RemoteOKHandler,
+    LandingJobsHandler, TheMuseHandler, HackerNewsHandler
 )
 from handlers.email_extractor import JobEmailExtractor
 from routers import TelegramRouter, GoogleSheetsRouter, EmailRouter
@@ -245,6 +246,14 @@ def fetch_board(company_name: str, board_config: dict):
         handler = WorkingNomadsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "weworkremotely":
         handler = WeWorkRemotelyHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "remoteok":
+        handler = RemoteOKHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "landingjobs":
+        handler = LandingJobsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "themuse":
+        handler = TheMuseHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "hackernews":
+        handler = HackerNewsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "wellfound":
         handler = WellfoundHandler(
             company_name,

@@ -48,6 +48,13 @@ class Job:
             if jk_val:
                 return f"https://www.indeed.com/viewjob?jk={jk_val[0]}"
                 
+        elif "ycombinator.com" in parsed.netloc and "/item" in parsed.path:
+            # Preserve the 'id' parameter for Hacker News comments/items
+            query_params = urllib.parse.parse_qs(parsed.query)
+            item_id = query_params.get("id")
+            if item_id:
+                return f"https://news.ycombinator.com/item?id={item_id[0]}"
+                
         # Fallback: remove query parameters for other websites
         return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, parsed.path, '', '', ''))
 
