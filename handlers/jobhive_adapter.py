@@ -73,13 +73,16 @@ class JobhiveAdapterHandler(BaseHandler):
                 if not self.is_within_lookback(posted_time):
                     continue
                     
-                company = (getattr(jobhive_job, "company", None) or "").strip() or self.company_name
+                company = str(getattr(jobhive_job, "company", None) or self.company_name or "").strip()
+                t_str = str(title or "").strip()
+                l_str = str(location or "Remote / Not Specified").strip()
+                u_str = str(url or "").strip()
 
                 matching_jobs.append(Job(
                     company=company,
-                    title=title.strip(),
-                    location=location.strip(),
-                    url=url.strip(),
+                    title=t_str,
+                    location=l_str,
+                    url=u_str,
                     posted_time=posted_time
                 ))
             except Exception as e:

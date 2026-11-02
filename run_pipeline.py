@@ -342,9 +342,6 @@ def main():
                 elif not jurl:
                     job_dicts.append(jdict)
 
-            # Apply to all Jobs Matched in this run
-            jobs_to_apply = job_dicts
-
             # --- Deduplication logic for Google Sheets new records ---
             existing_urls = []
 
@@ -381,6 +378,13 @@ def main():
             # Filter job list to identify newly discovered listings
             new_jobs = [job for job in job_dicts if job["URL"] not in all_existing_urls]
             print(f"Identified {len(new_jobs)} new job(s) out of {len(job_dicts)} matched job(s).")
+
+            # Only newly discovered listings should be queued for auto-application
+            # Existing listings have already been processed in prior runs
+            max_apply_cap = int(os.getenv("MAX_AUTO_APPLY_PER_RUN", "8"))
+            jobs_to_apply = new_jobs[:max_apply_cap]
+            if len(new_jobs) > max_apply_cap:
+                print(f"[Auto-Apply] Capped auto-apply batch to top {max_apply_cap} new job(s) to guarantee sub-10m runtime. Remaining {len(new_jobs) - max_apply_cap} will be logged as Pending.")
         else:
             print("No matches found. Skipping deduplication and export.")
 
@@ -489,6 +493,8 @@ def main():
                                 tg.send_message(tg_msg)
                             except Exception as tg_err:
                                 print(f"[Auto-Apply] Failed sending Telegram error update: {tg_err}")
+        elif not jobs_to_apply and AUTO_APPLY_ENABLED and job_dicts:
+            print("\n[Auto-Apply] All matched jobs were already processed in previous runs. Skipping redundant auto-apply.")
         elif jobs_to_apply and not AUTO_APPLY_ENABLED:
             print("\n[Auto-Apply] AUTO_APPLY_ENABLED is false. Skipping automated tailoring/application.")
 

@@ -274,10 +274,9 @@ class PlaywrightBrowserApplier:
                         print(f"[BrowserApplier] Direct apply URL failed, falling back to base URL: {target_url}")
                         page.goto(target_url, wait_until="domcontentloaded")
 
-                time.sleep(random.uniform(1.5, 2.5))
+                time.sleep(1.0)
                 self._dismiss_cookie_banners(page)
-                self._handle_cloudflare_turnstile(page)
-                self.captcha_solver.solve_if_present(page)
+                self.captcha_solver.solve_if_present(page, max_wait_sec=6)
 
                 # Step 3: Trigger application form if landing on an overview/job detail view
                 controls = self.form_agent.inspect_form(page)
@@ -357,8 +356,9 @@ class PlaywrightBrowserApplier:
 
                 answers = self.form_agent.answer_fields(controls, candidate)
 
-                # Ensure any CAPTCHA challenge on the form is solved before submission
-                self.captcha_solver.solve_if_present(page)
+                # Solve CAPTCHA before submission only if a challenge is active
+                if self.captcha_solver._has_turnstile(page) or self.captcha_solver._has_recaptcha(page) or self.captcha_solver._has_hcaptcha(page):
+                    self.captcha_solver.solve_if_present(page, max_wait_sec=6)
 
                 is_simulation = (mode in ("review", "dry_run") or self.dry_run)
                 auto_submit = (mode == "auto" and not self.dry_run)

@@ -57,10 +57,12 @@ class JobicyHandler(BaseHandler):
 
         description = raw_job.get("jobDescription") or ""
         tags = []
-        if raw_job.get("jobIndustry"):
-            tags.append(raw_job["jobIndustry"])
-        if raw_job.get("jobType"):
-            tags.append(raw_job["jobType"])
+        for field in ("jobIndustry", "jobType"):
+            val = raw_job.get(field)
+            if isinstance(val, list):
+                tags.extend([str(v).strip() for v in val if v])
+            elif isinstance(val, str) and val.strip():
+                tags.append(val.strip())
 
         # Parse publication date
         pub_date_str = raw_job.get("pubDate")

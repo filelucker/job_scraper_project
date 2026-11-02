@@ -29,7 +29,7 @@ class LeverHandler(BaseHandler):
         
         # Lever location categorization
         categories = raw_job.get("categories") or {}
-        location = categories.get("location", "Remote / Not Specified")
+        location = str(categories.get("location") or "Remote / Not Specified").strip()
         
         # Lever date parsing (createdAt is an epoch millisecond timestamp integer)
         created_at_val = raw_job.get("createdAt")

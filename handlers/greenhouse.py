@@ -27,7 +27,7 @@ class GreenhouseHandler(BaseHandler):
         
         # Get location (Greenhouse structure: {"name": "..."})
         location_dict = raw_job.get("location") or {}
-        location = location_dict.get("name", "Remote / Not Specified")
+        location = str(location_dict.get("name") or "Remote / Not Specified").strip()
         
         # Parse timestamp (Greenhouse standard is 'updated_at' string)
         updated_at_str = raw_job.get("updated_at")
