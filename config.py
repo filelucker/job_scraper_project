@@ -2815,6 +2815,10 @@ COMPANY_BOARDS = {
     'Square': {'ats': 'smartrecruiters', 'token': 'Square'},
     'Deezer': {'ats': 'smartrecruiters', 'token': 'Deezer'},
     'Tidal': {'ats': 'smartrecruiters', 'token': 'TIDAL'},
+    'Automattic': {'ats': 'greenhouse', 'token': 'automattic'},
+    'Buffer': {'ats': 'ashby', 'token': 'buffer'},
+    'DuckDuckGo': {'ats': 'greenhouse', 'token': 'duckduckgo'},
+    'Personio': {'ats': 'personio', 'token': 'personio'},
 
     # --- Aggregators & Global Remote Platforms ---
     'Adzuna': {'ats': 'adzuna', 'token': '*'},

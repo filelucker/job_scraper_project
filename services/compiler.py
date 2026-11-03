@@ -49,6 +49,7 @@ class LatexCompiler:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.template_path = template_path or os.path.join(base_dir, "templates", "resume_template.tex")
         self.tectonic_bin = get_tectonic_path()
+        self.compilation_failed = False
 
     def render_latex(
         self,
@@ -103,6 +104,9 @@ class LatexCompiler:
 
     def compile_pdf(self, latex_content: str, output_pdf_path: str) -> bool:
         """Compile given LaTeX content into a PDF file at output_pdf_path using Tectonic."""
+        if self.compilation_failed:
+            return False
+
         if not self.tectonic_bin or not os.path.exists(self.tectonic_bin):
             print("[LatexCompiler] Tectonic executable not found in PATH or install directory. Skipping custom PDF compilation.")
             return False
@@ -126,13 +130,17 @@ class LatexCompiler:
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    timeout=45,
+                    timeout=15,
                     check=True
                 )
                 generated_pdf = os.path.join(temp_dir, "resume.pdf")
                 if os.path.exists(generated_pdf):
                     shutil.copy2(generated_pdf, output_pdf_path)
                     return True
+                return False
+            except subprocess.TimeoutExpired:
+                self.compilation_failed = True
+                print("[LatexCompiler] Tectonic compilation timed out after 15s. Disabling further compilation attempts for this run to conserve pipeline budget; master resume will be used as fallback.")
                 return False
             except subprocess.CalledProcessError as e:
                 err_output = e.stderr.decode('utf-8', errors='ignore')

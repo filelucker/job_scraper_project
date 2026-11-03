@@ -135,7 +135,7 @@ class AutoApplyDispatcher:
             master_pdf = os.path.abspath("master_resume.pdf")
             if os.path.exists(master_pdf):
                 pdf_path = master_pdf
-            elif self.compiler.tectonic_bin:
+            elif self.compiler.tectonic_bin and not getattr(self.compiler, 'compilation_failed', False):
                 self.compiler.compile_pdf(self.compiler.render_latex(), pdf_path)
 
         # 3. Route to specific channel with resilient fallback to browser

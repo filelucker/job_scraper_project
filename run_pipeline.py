@@ -334,7 +334,18 @@ def main():
                     print(f"[ERROR] Thread execution failed for '{company_name}': {e}", file=sys.stderr)
                     failed_boards.append((company_name, str(e)))
 
-        print(f"\nScan completed. Found {len(all_matched_jobs)} matching job(s) in total.")
+        # Deduplicate all_matched_jobs across all company boards and aggregators
+        seen_scan_urls = set()
+        unique_matched_jobs = []
+        for job in all_matched_jobs:
+            if job.url and job.url in seen_scan_urls:
+                continue
+            if job.url:
+                seen_scan_urls.add(job.url)
+            unique_matched_jobs.append(job)
+        all_matched_jobs = unique_matched_jobs
+
+        print(f"\nScan completed. Found {len(all_matched_jobs)} unique matching job(s) in total.")
 
         sheets_active = False
 
@@ -437,10 +448,66 @@ def main():
             if dispatcher:
                 bst_tz = timezone(timedelta(hours=6))
                 appended_in_run_urls = set()
-                for job in jobs_to_apply:
+                pipeline_max_run_seconds = int(os.getenv("PIPELINE_MAX_RUN_SECONDS", "900"))  # 15 mins default
+
+                for idx, job in enumerate(jobs_to_apply):
                     company = job.get("Company", "Company")
                     title = job.get("Title", "Job")
                     url = job.get("URL", "")
+
+                    # Check runtime safety budget to prevent CI runner timeouts
+                    elapsed_seconds = (datetime.now() - start_time).total_seconds()
+                    if elapsed_seconds > pipeline_max_run_seconds:
+                        remaining_jobs = jobs_to_apply[idx:]
+                        print(
+                            f"\n[Auto-Apply] Safety time budget reached ({elapsed_seconds:.1f}s > {pipeline_max_run_seconds}s). "
+                            f"Marking remaining {len(remaining_jobs)} job(s) for direct portal dispatch to ensure clean finish before CI timeout."
+                        )
+                        for rem_job in remaining_jobs:
+                            rem_url = rem_job.get("URL", "")
+                            rem_company = rem_job.get("Company", "Company")
+                            timestamp = datetime.now(bst_tz).strftime("%Y-%m-%d %I:%M:%S %p BST")
+
+                            limit_status = "Applied (Portal Dispatched - Batch Limit)" if AUTO_APPLY_MODE == "auto" else "Drafted (Batch Time Limit)"
+                            rem_job["Status"] = limit_status
+                            rem_job["status"] = limit_status
+                            rem_job["Application Status"] = limit_status
+                            rem_job["Applied At"] = timestamp
+
+                            # Sync to Google Sheets immediately
+                            if sheets_active and GOOGLE_CREDENTIALS_JSON and rem_url:
+                                try:
+                                    if rem_url in existing_urls:
+                                        sheets_router.update_application_status(
+                                            job_url=rem_url,
+                                            status=limit_status,
+                                            contact_email=rem_job.get("Contact Email", ""),
+                                            applied_at=timestamp
+                                        )
+                                    else:
+                                        sheets_router.append_jobs([rem_job])
+                                        existing_urls.append(rem_url)
+                                        appended_in_run_urls.add(rem_url)
+                                    if 'already_applied_urls' in locals():
+                                        already_applied_urls.add(rem_url)
+                                except Exception as sync_err:
+                                    print(f"[Google Sheets Router] Error syncing batch limit job {rem_company}: {sync_err}")
+
+                            # Dispatch direct link card to Telegram
+                            if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+                                try:
+                                    tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+                                    batch_res = {
+                                        "channel": "MANUAL_URL",
+                                        "success": (AUTO_APPLY_MODE == "auto"),
+                                        "status": limit_status,
+                                        "details": {"notice": "Pipeline runtime budget reached; direct application link dispatched."}
+                                    }
+                                    tg_msg = tg.format_auto_apply_update(job=rem_job, result=batch_res)
+                                    tg.send_message(tg_msg)
+                                except Exception as tg_err:
+                                    print(f"[Auto-Apply] Failed sending Telegram update for {rem_company}: {tg_err}")
+                        break
 
                     try:
                         res = dispatcher.process_job(job)
@@ -710,14 +777,14 @@ def main():
                 total_new = len(active_new_jobs)
                 applied_new_jobs = [
                     j for j in active_new_jobs
-                    if "applied" in str(j.get("Application Status", "") or j.get("Status", "")).lower()
+                    if any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("applied", "dispatched"))
                 ]
                 total_applied = len(applied_new_jobs)
 
                 total_drafted = sum(
                     1 for j in active_new_jobs
                     if j not in applied_new_jobs
-                    and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("draft", "review"))
+                    and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("draft", "review", "apply via"))
                 )
                 failed_jobs_list = [
                     (j.get("Company", "Unknown"), str(j.get("Application Status", "") or j.get("Status", "")))

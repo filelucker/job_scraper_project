@@ -145,7 +145,7 @@ class PlaywrightBrowserApplier:
             except Exception:
                 pass
 
-    def _handle_cloudflare_turnstile(self, page, max_wait_sec: int = 15):
+    def _handle_cloudflare_turnstile(self, page, max_wait_sec: int = 8):
         """
         Detects Cloudflare Turnstile bot verification challenges and attempts
         to solve/click the checkbox with behavioral simulation or solver.
@@ -260,7 +260,7 @@ class PlaywrightBrowserApplier:
                     else:
                         raise
 
-                page.set_default_timeout(35000)
+                page.set_default_timeout(18000)
 
                 # Step 2: Inject Stealth Scripts
                 self._inject_stealth_scripts(page)
@@ -276,7 +276,7 @@ class PlaywrightBrowserApplier:
 
                 time.sleep(1.0)
                 self._dismiss_cookie_banners(page)
-                self.captcha_solver.solve_if_present(page, max_wait_sec=6)
+                self.captcha_solver.solve_if_present(page, max_wait_sec=4)
 
                 # Step 3: Trigger application form if landing on an overview/job detail view
                 controls = self.form_agent.inspect_form(page)
@@ -358,7 +358,7 @@ class PlaywrightBrowserApplier:
 
                 # Solve CAPTCHA before submission only if a challenge is active
                 if self.captcha_solver._has_turnstile(page) or self.captcha_solver._has_recaptcha(page) or self.captcha_solver._has_hcaptcha(page):
-                    self.captcha_solver.solve_if_present(page, max_wait_sec=6)
+                    self.captcha_solver.solve_if_present(page, max_wait_sec=4)
 
                 is_simulation = (mode in ("review", "dry_run") or self.dry_run)
                 auto_submit = (mode == "auto" and not self.dry_run)

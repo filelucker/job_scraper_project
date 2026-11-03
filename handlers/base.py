@@ -203,6 +203,7 @@ class BaseHandler:
         """Orchestrate the fetch, parse, and filter steps."""
         matching_jobs = []
         raw_listings = self.fetch_raw_jobs()
+        seen_urls = set()
         
         for raw_job in raw_listings:
             try:
@@ -215,6 +216,10 @@ class BaseHandler:
                 if (has_keyword_match and 
                     self.is_within_lookback(job.posted_time) and 
                     self.matches_location(job.location, job.title, job)):
+                    if job.url and job.url in seen_urls:
+                        continue
+                    if job.url:
+                        seen_urls.add(job.url)
                     matching_jobs.append(job)
             except Exception as e:
                 # Log parsing errors but don't fail the overall run

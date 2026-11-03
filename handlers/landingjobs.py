@@ -36,6 +36,9 @@ class LandingJobsHandler(BaseHandler):
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
             resp = requests.get(self.api_url, headers=headers, timeout=15)
+            if resp.status_code == 403:
+                print("[LandingJobs] API returned 403 Forbidden (Cloudflare WAF / runner IP block). Skipping.")
+                return []
             resp.raise_for_status()
             data = resp.json()
             if isinstance(data, list):
