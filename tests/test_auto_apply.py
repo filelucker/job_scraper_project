@@ -244,15 +244,15 @@ class TestAutoApplyPipeline(unittest.TestCase):
         self.assertEqual(dispatcher.detect_channel(indeed_job), "MANUAL_URL")
         res = dispatcher.process_job(indeed_job)
         self.assertEqual(res["channel"], "MANUAL_URL")
-        self.assertEqual(res["status"], "Apply via URL")
+        self.assertEqual(res["status"], "Requires Manual Apply (Login Required)")
         self.assertFalse(res["success"])
 
-        # In auto mode, portal dispatch is completed with Applied status
+        # In auto mode, manual apply is also verified as requiring candidate login
         dispatcher_auto = AutoApplyDispatcher(mode="auto")
         res_auto = dispatcher_auto.process_job(indeed_job)
         self.assertEqual(res_auto["channel"], "MANUAL_URL")
-        self.assertEqual(res_auto["status"], "Applied (Portal Dispatched)")
-        self.assertTrue(res_auto["success"])
+        self.assertEqual(res_auto["status"], "Requires Manual Apply (Login Required)")
+        self.assertFalse(res_auto["success"])
 
         # 3. Test get_unapplied_jobs skips finalized/apply-via-url rows and enforces max_jobs
         from routers import GoogleSheetsRouter

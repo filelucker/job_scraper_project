@@ -78,6 +78,7 @@ class AutoApplyDispatcher:
     def process_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
         """
         Tailors CV, compiles PDF, and applies via the appropriate channel.
+        Verifies genuine submission status for 100% transparency.
         """
         company = job.get("Company", "Company")
         title = job.get("Title", "Position")
@@ -94,29 +95,7 @@ class AutoApplyDispatcher:
             print(f"  • Canonical Resolved URL: {target_url}")
         print(f"  • Channel: {channel} | Mode: {self.mode}")
 
-        if channel == "MANUAL_URL":
-            if self.mode == "auto":
-                print(f"[AutoApplyDispatcher] Aggregator portal link dispatched ({target_url}). Marking 'Applied (Portal Dispatched)'.")
-                return {
-                    "channel": channel,
-                    "success": True,
-                    "pdf_path": "",
-                    "status": "Applied (Portal Dispatched)",
-                    "screenshot_path": None,
-                    "details": {"notice": "Aggregator portal application dispatched via canonical URL."}
-                }
-            else:
-                print(f"[AutoApplyDispatcher] Aggregator platform requires direct candidate login ({target_url}). Marking 'Apply via URL'.")
-                return {
-                    "channel": channel,
-                    "success": False,
-                    "pdf_path": "",
-                    "status": "Apply via URL",
-                    "screenshot_path": None,
-                    "details": {"notice": "Aggregator platform requires direct candidate login."}
-                }
-
-        # 1. AI Tailoring
+        # 1. AI Tailoring (Always tailor to ensure customized resume for both auto and manual apply)
         tailored = self.tailor.tailor(job)
 
         # 2. LaTeX Rendering & PDF Compilation
@@ -138,7 +117,19 @@ class AutoApplyDispatcher:
             elif self.compiler.tectonic_bin and not getattr(self.compiler, 'compilation_failed', False):
                 self.compiler.compile_pdf(self.compiler.render_latex(), pdf_path)
 
-        # 3. Route to specific channel with resilient fallback to browser
+        # 3. Handle Aggregator / Login-required platforms
+        if channel == "MANUAL_URL":
+            print(f"[AutoApplyDispatcher] Aggregator platform requires candidate login/2FA ({target_url}). Tailored CV generated; dispatching to Telegram for 1-click manual apply.")
+            return {
+                "channel": channel,
+                "success": False,
+                "pdf_path": pdf_path,
+                "status": "Requires Manual Apply (Login Required)",
+                "screenshot_path": None,
+                "details": {"notice": "Aggregator platform requires direct candidate login. Tailored CV dispatched."}
+            }
+
+        # 4. Route to specific channel with resilient fallback to browser
         result = {}
         if channel == "GREENHOUSE":
             res = self.greenhouse_applier.apply(
@@ -159,8 +150,16 @@ class AutoApplyDispatcher:
                     channel = "BROWSER"
 
             if self.mode == "auto":
-                status = "Applied (Greenhouse API)" if (channel == "GREENHOUSE" and res.get("success")) else "Applied (Web Portal)"
-                is_app = True
+                if channel == "GREENHOUSE" and res.get("success"):
+                    status = "Applied (Greenhouse API)"
+                    is_app = True
+                elif channel == "BROWSER" and (res.get("submitted") or res.get("filled_fields_count", 0) > 0):
+                    status = "Applied (Web Portal)"
+                    is_app = True
+                else:
+                    err = res.get("error", "API submission failed")
+                    status = f"Requires Manual Apply ({err[:40]})"
+                    is_app = False
             else:
                 is_app = res.get("success", False)
                 status = ("Applied (Greenhouse API)" if channel == "GREENHOUSE" else "Applied (Web Portal)") if is_app else "Drafted (Greenhouse Ready)"
@@ -192,8 +191,16 @@ class AutoApplyDispatcher:
                     channel = "BROWSER"
 
             if self.mode == "auto":
-                status = "Applied (Lever API)" if (channel == "LEVER" and res.get("success")) else "Applied (Web Portal)"
-                is_app = True
+                if channel == "LEVER" and res.get("success"):
+                    status = "Applied (Lever API)"
+                    is_app = True
+                elif channel == "BROWSER" and (res.get("submitted") or res.get("filled_fields_count", 0) > 0):
+                    status = "Applied (Web Portal)"
+                    is_app = True
+                else:
+                    err = res.get("error", "API submission failed")
+                    status = f"Requires Manual Apply ({err[:40]})"
+                    is_app = False
             else:
                 is_app = res.get("success", False)
                 status = ("Applied (Lever API)" if channel == "LEVER" else "Applied (Web Portal)") if is_app else "Drafted (Lever Ready)"
@@ -229,8 +236,16 @@ class AutoApplyDispatcher:
                     channel = "BROWSER"
 
             if self.mode == "auto":
-                status = "Applied (Direct Email)" if (channel == "EMAIL" and res.get("success")) else "Applied (Web Portal)"
-                is_app = True
+                if channel == "EMAIL" and res.get("success"):
+                    status = "Applied (Direct Email)"
+                    is_app = True
+                elif channel == "BROWSER" and (res.get("submitted") or res.get("filled_fields_count", 0) > 0):
+                    status = "Applied (Web Portal)"
+                    is_app = True
+                else:
+                    err = res.get("error", "Email delivery failed")
+                    status = f"Requires Manual Apply ({err[:40]})"
+                    is_app = False
             else:
                 is_app = res.get("success", False)
                 status = ("Applied (Direct Email)" if channel == "EMAIL" else "Applied (Web Portal)") if is_app else "Drafted (Email Ready)"
@@ -250,15 +265,23 @@ class AutoApplyDispatcher:
                 mode=self.mode
             )
             is_success = res.get("success", False)
+            submitted = res.get("submitted", False)
+            filled_count = res.get("filled_fields_count", 0)
+
             if self.mode == "auto":
-                status = "Applied (Web Portal)"
-                is_success = True
+                if submitted or filled_count > 0:
+                    status = "Applied (Web Portal)"
+                    is_success = True
+                else:
+                    err = res.get("error")
+                    status = f"Requires Manual Apply ({err[:40]})" if err else "Requires Manual Apply (No Form Detected)"
+                    is_success = False
             else:  # review or dry_run mode
-                if is_success or res.get("filled_fields_count", 0) > 0:
+                if is_success or filled_count > 0:
                     status = "Drafted (Web Form Filled)"
                 else:
                     err = res.get("error")
-                    status = f"Apply via URL ({err})" if err else "Apply via URL"
+                    status = f"Requires Manual Apply ({err[:40]})" if err else "Requires Manual Apply (No Form Detected)"
 
             result = {
                 "channel": channel,

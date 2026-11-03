@@ -527,7 +527,7 @@ def main():
                         is_applied = (
                             res.get("success", False)
                             or status_lower.startswith("applied")
-                        ) and not any(x in status_lower for x in ("draft", "fail", "error"))
+                        ) and not any(x in status_lower for x in ("draft", "fail", "error", "manual", "batch limit"))
 
                         # Persist to Google Sheets immediately so progress is never lost
                         if sheets_active and GOOGLE_CREDENTIALS_JSON and url:
@@ -777,19 +777,23 @@ def main():
                 total_new = len(active_new_jobs)
                 applied_new_jobs = [
                     j for j in active_new_jobs
-                    if any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("applied", "dispatched"))
+                    if str(j.get("Application Status", "") or j.get("Status", "")).lower().startswith("applied")
+                    and not any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("fail", "error", "manual"))
                 ]
                 total_applied = len(applied_new_jobs)
 
-                total_drafted = sum(
-                    1 for j in active_new_jobs
+                manual_new_jobs = [
+                    j for j in active_new_jobs
                     if j not in applied_new_jobs
-                    and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("draft", "review", "apply via"))
-                )
+                    and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("manual", "draft", "review", "batch limit", "login", "apply via"))
+                ]
+                total_drafted = len(manual_new_jobs)
+
                 failed_jobs_list = [
                     (j.get("Company", "Unknown"), str(j.get("Application Status", "") or j.get("Status", "")))
                     for j in active_new_jobs
                     if j not in applied_new_jobs
+                    and j not in manual_new_jobs
                     and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("fail", "error"))
                 ]
                 total_failed = len(failed_jobs_list)
