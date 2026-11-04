@@ -26,6 +26,10 @@ from handlers.remoteok import RemoteOKHandler
 from handlers.landingjobs import LandingJobsHandler
 from handlers.themuse import TheMuseHandler
 from handlers.hackernews import HackerNewsHandler
+from handlers.jobspresso import JobspressoHandler
+from handlers.cryptojobslist import CryptoJobsListHandler
+from handlers.nodesk import NoDeskHandler
+from handlers.eustartups import EUStartupsHandler
 
 __all__ = [
     "BaseHandler", "Job", "GreenhouseHandler", "LeverHandler", "FallbackHandler",
@@ -35,5 +39,6 @@ __all__ = [
     "GermanTechJobsHandler", "RelocateMeHandler", "WellfoundHandler",
     "RemotiveHandler", "HimalayasHandler", "JobicyHandler", "WorkingNomadsHandler",
     "WeWorkRemotelyHandler", "RemoteOKHandler", "LandingJobsHandler", "TheMuseHandler",
-    "HackerNewsHandler"
+    "HackerNewsHandler", "JobspressoHandler", "CryptoJobsListHandler", "NoDeskHandler",
+    "EUStartupsHandler"
 ]

@@ -48,7 +48,8 @@ from handlers import (
     WellfoundHandler,
     RemotiveHandler, HimalayasHandler, JobicyHandler,
     WorkingNomadsHandler, WeWorkRemotelyHandler, RemoteOKHandler,
-    LandingJobsHandler, TheMuseHandler, HackerNewsHandler
+    LandingJobsHandler, TheMuseHandler, HackerNewsHandler,
+    JobspressoHandler, CryptoJobsListHandler, NoDeskHandler, EUStartupsHandler
 )
 from handlers.email_extractor import JobEmailExtractor
 from routers import TelegramRouter, GoogleSheetsRouter, EmailRouter
@@ -254,6 +255,14 @@ def fetch_board(company_name: str, board_config: dict):
         handler = TheMuseHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "hackernews":
         handler = HackerNewsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "jobspresso":
+        handler = JobspressoHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "cryptojobslist":
+        handler = CryptoJobsListHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "nodesk":
+        handler = NoDeskHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
+    elif ats_type == "eustartups":
+        handler = EUStartupsHandler(company_name, token, KEYWORDS, JOB_LOOKBACK_HOURS, only_remote_or_hybrid=ONLY_REMOTE_OR_HYBRID, compound_rules=COMPOUND_RULES)
     elif ats_type == "wellfound":
         handler = WellfoundHandler(
             company_name,

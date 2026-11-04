@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone, timedelta
-from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler, ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler, WellfoundHandler, RemotiveHandler, HimalayasHandler, JobicyHandler, WorkingNomadsHandler, WeWorkRemotelyHandler, RemoteOKHandler, LandingJobsHandler, TheMuseHandler, HackerNewsHandler
+from handlers import AshbyHandler, GreenhouseHandler, LeverHandler, Job, WorkdayHandler, WorkableHandler, SmartRecruitersHandler, AdzunaHandler, JoobleHandler, FlexjobsHandler, LinkedInHandler, IndeedHandler, ArbeitnowHandler, WeAreDevelopersHandler, GermanTechJobsHandler, RelocateMeHandler, WellfoundHandler, RemotiveHandler, HimalayasHandler, JobicyHandler, WorkingNomadsHandler, WeWorkRemotelyHandler, RemoteOKHandler, LandingJobsHandler, TheMuseHandler, HackerNewsHandler, JobspressoHandler, CryptoJobsListHandler, NoDeskHandler, EUStartupsHandler
 from handlers.base import BaseHandler
 
 class DummyHandler(BaseHandler):
@@ -770,6 +770,63 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(job.company, "NetBird")
         self.assertEqual(job.url, "https://netbird.io/careers")
         self.assertEqual(job.location, "Berlin, Germany")
+
+    def test_jobspresso_parsing(self):
+        handler = JobspressoHandler("Jobspresso", "*", ["Flutter"], 24)
+        raw_job = {
+            "raw_title": "Senior Flutter Developer at MobileCraft",
+            "url": "https://jobspresso.co/job/senior-flutter-developer/",
+            "pub_date": "Sun, 01 Nov 2026 12:00:00 +0000",
+            "description": "We are looking for a Flutter Engineer."
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "MobileCraft")
+        self.assertEqual(job.title, "Senior Flutter Developer")
+        self.assertEqual(job.url, "https://jobspresso.co/job/senior-flutter-developer/")
+        self.assertIn("Remote", job.location)
+
+    def test_cryptojobslist_parsing(self):
+        handler = CryptoJobsListHandler("CryptoJobsList", "*", ["Android"], 24)
+        raw_job = {
+            "raw_title": "Uniswap is hiring an Android Engineer",
+            "url": "https://cryptojobslist.com/jobs/android-engineer-uniswap",
+            "pub_date": "Sun, 01 Nov 2026 10:00:00 +0000",
+            "description": "Build mobile web3 solutions."
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Uniswap")
+        self.assertEqual(job.title, "Android Engineer")
+        self.assertIn("Remote", job.location)
+
+    def test_nodesk_parsing(self):
+        handler = NoDeskHandler("NoDesk", "*", ["Mobile"], 24)
+        raw_job = {
+            "raw_title": "Superlist – Mobile Lead",
+            "url": "https://nodesk.co/remote-jobs/superlist-mobile-lead/",
+            "pub_date": "Sun, 01 Nov 2026 09:00:00 +0000",
+            "description": "Lead Flutter and mobile team."
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "Superlist")
+        self.assertEqual(job.title, "Mobile Lead")
+        self.assertIn("Remote", job.location)
+
+    def test_eustartups_parsing(self):
+        handler = EUStartupsHandler("EU-Startups", "*", ["iOS"], 24)
+        raw_job = {
+            "raw_title": "Senior iOS Developer at FinTech Europe (Berlin)",
+            "url": "https://www.eu-startups.com/jobs/senior-ios-developer/",
+            "pub_date": "Sun, 01 Nov 2026 08:00:00 +0000",
+            "description": "Visa sponsorship provided."
+        }
+        job = handler.parse_job(raw_job)
+        self.assertIsNotNone(job)
+        self.assertEqual(job.company, "FinTech Europe")
+        self.assertEqual(job.title, "Senior iOS Developer")
+        self.assertEqual(job.location, "Berlin")
 
 if __name__ == "__main__":
     unittest.main()
