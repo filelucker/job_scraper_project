@@ -24,6 +24,8 @@ secrets/
 !requirements.txt
 !package.json
 !candidate_profile.json
+!tools/**/*.json
+!tools/*.json
 # Local log files and state caches
 pipeline.log
 scraped_jobs.json

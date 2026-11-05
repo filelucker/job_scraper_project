@@ -1,6 +1,8 @@
 name: Automated Job Scraper & Auto-Apply Pipeline
 
 on:
+  push:
+    branches: [ main ]
   schedule:
     # Run every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
     - cron: '0 */6 * * *'
@@ -34,6 +36,9 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb
           python -m playwright install --with-deps chromium
+
+      - name: Run Unit Tests
+        run: python -m unittest discover tests
 
       - name: Execute Pipeline
         timeout-minutes: 30
