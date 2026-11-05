@@ -162,7 +162,8 @@ def fetch_board(company_name: str, board_config: dict):
         print(f"[Jooble - {company_name}] Info: JOOBLE_API_KEY is not set. Skipping board.", file=sys.stderr)
         return company_name, [], "skipped", None
 
-    if ats_type == "linkedin" and (not APIFY_API_TOKEN or APIFY_API_TOKEN.startswith("your_apify_")):
+    # LinkedIn uses Voyager API or Public Guest Search if APIFY_API_TOKEN is not configured
+    if False and ats_type == "linkedin":
         print(f"[LinkedIn - {company_name}] Info: APIFY_API_TOKEN is not set or is placeholder. Skipping board.", file=sys.stderr)
         return company_name, [], "skipped", None
 

@@ -2981,6 +2981,55 @@ COMPANY_BOARDS = {
     'Welcome to the Jungle': {'ats': 'welcometothejungle', 'token': 'welcome-to-the-jungle'},
     'The Hub (Nordic Startups)': {'ats': 'thehub', 'token': 'the-hub'},
     'Manfred (Tech Careers EU)': {'ats': 'manfred', 'token': 'manfred'},
+
+    # --- Big Tech & Global Giants (via Jobhive) ---
+    'Meta': {'ats': 'meta', 'token': 'facebook'},
+    'Tesla': {'ats': 'tesla', 'token': 'tesla'},
+    'Uber Technologies': {'ats': 'uber', 'token': 'uber'},
+
+    # --- Fortune 500 & Tech Leaders (Workday CXS API) ---
+    'Nvidia (Workday)': {'ats': 'workday', 'token': 'nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite'},
+    'Salesforce (Workday)': {'ats': 'workday', 'token': 'salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/External_Career_Site'},
+    'Adobe (Workday)': {'ats': 'workday', 'token': 'adobe.wd5.myworkdayjobs.com/wday/cxs/adobe/external_experienced'},
+    'Autodesk (Workday)': {'ats': 'workday', 'token': 'autodesk.wd1.myworkdayjobs.com/wday/cxs/autodesk/Ext'},
+    'PayPal (Workday)': {'ats': 'workday', 'token': 'paypal.wd1.myworkdayjobs.com/wday/cxs/paypal/jobs'},
+    'Dell (Workday)': {'ats': 'workday', 'token': 'dell.wd1.myworkdayjobs.com/wday/cxs/dell/External'},
+    'HP Inc (Workday)': {'ats': 'workday', 'token': 'hp.wd5.myworkdayjobs.com/wday/cxs/hp/ExternalCareerSite'},
+    'Walmart Global Tech (Workday)': {'ats': 'workday', 'token': 'walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/WalmartExternal'},
+    'Target Tech (Workday)': {'ats': 'workday', 'token': 'target.wd5.myworkdayjobs.com/wday/cxs/target/targetcareers'},
+    'Workday Inc': {'ats': 'workday', 'token': 'workday.wd5.myworkdayjobs.com/wday/cxs/workday/Workday'},
+    'Cisco (Workday)': {'ats': 'workday', 'token': 'cisco.wd102.myworkdayjobs.com/wday/cxs/cisco/Cisco_Careers'},
+    'Visa (Workday)': {'ats': 'workday', 'token': 'visa.wd1.myworkdayjobs.com/wday/cxs/visa/Visa'},
+    'Mastercard (Workday)': {'ats': 'workday', 'token': 'mastercard.wd1.myworkdayjobs.com/wday/cxs/mastercard/CorporateCareers'},
+    'Sony (Workday)': {'ats': 'workday', 'token': 'sony.wd1.myworkdayjobs.com/wday/cxs/sony/Sony_Careers'},
+    'Klarna (Workday)': {'ats': 'workday', 'token': 'klarna.wd3.myworkdayjobs.com/wday/cxs/klarna/Careers'},
+
+    # --- Frontier AI, LLM & Mobile Tooling (Ashby) ---
+    'FlutterFlow': {'ats': 'ashby', 'token': 'flutterflow'},
+    'Anysphere (Cursor)': {'ats': 'ashby', 'token': 'anysphere'},
+    'Phind': {'ats': 'ashby', 'token': 'phind'},
+    'Factory AI': {'ats': 'ashby', 'token': 'factory'},
+    'E2B': {'ats': 'ashby', 'token': 'e2b'},
+    'Supermaven': {'ats': 'ashby', 'token': 'supermaven'},
+    'Continue.dev': {'ats': 'ashby', 'token': 'continue'},
+    'Daily.co': {'ats': 'ashby', 'token': 'daily'},
+    'Tinybird': {'ats': 'ashby', 'token': 'tinybird'},
+    'Deno': {'ats': 'ashby', 'token': 'deno'},
+    'Bun (Oven)': {'ats': 'ashby', 'token': 'oven'},
+    'Astral (uv & ruff)': {'ats': 'ashby', 'token': 'astral'},
+    'Humanloop': {'ats': 'ashby', 'token': 'humanloop'},
+    'Vellum AI': {'ats': 'ashby', 'token': 'vellum'},
+    'Helicone': {'ats': 'ashby', 'token': 'helicone'},
+    'Langfuse': {'ats': 'ashby', 'token': 'langfuse'},
+    'Protect AI': {'ats': 'ashby', 'token': 'protectai'},
+    'HiddenLayer': {'ats': 'ashby', 'token': 'hiddenlayer'},
+
+    # --- UAE & MENA Tech Unicorns (Ashby, Lever & Greenhouse) ---
+    'Lean Technologies (UAE)': {'ats': 'ashby', 'token': 'leantechnologies'},
+    'Trukker (UAE)': {'ats': 'lever', 'token': 'trukker'},
+    'Baraka (UAE)': {'ats': 'ashby', 'token': 'baraka'},
+    'Dapi (UAE)': {'ats': 'ashby', 'token': 'dapi'},
+    'Bayzat (UAE)': {'ats': 'greenhouse', 'token': 'bayzat'},
 }
 
 # ==========================================
