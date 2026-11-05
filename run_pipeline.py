@@ -458,6 +458,7 @@ def main():
                 bst_tz = timezone(timedelta(hours=6))
                 appended_in_run_urls = set()
                 pipeline_max_run_seconds = int(os.getenv("PIPELINE_MAX_RUN_SECONDS", "900"))  # 15 mins default
+                send_manual_alerts = os.getenv("TELEGRAM_SEND_MANUAL_APPLY_ALERTS", "false").lower() in ("true", "1", "yes")
 
                 for idx, job in enumerate(jobs_to_apply):
                     company = job.get("Company", "Company")
@@ -503,7 +504,7 @@ def main():
                                     print(f"[Google Sheets Router] Error syncing batch limit job {rem_company}: {sync_err}")
 
                             # Dispatch direct link card to Telegram
-                            if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+                            if send_manual_alerts and TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
                                 try:
                                     tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
                                     batch_res = {
@@ -560,9 +561,9 @@ def main():
                         if is_applied:
                             print(f"[Auto-Apply] Successfully auto-applied to {company} ({title}) via {channel}. Suppressing Telegram PDF/draft notification as requested.")
                         else:
-                            # Auto-apply failed, drafted, or requires manual / human intervention -> send alert + tailored CV PDF to Telegram
-                            print(f"[Auto-Apply] Manual action / review needed for {company} ({title}) [Status: {status_text}]. Dispatching draft & tailored PDF to Telegram...")
-                            if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+                            # Auto-apply failed, drafted, or requires manual / human intervention
+                            print(f"[Auto-Apply] Application status for {company} ({title}): {status_text}")
+                            if send_manual_alerts and TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
                                 try:
                                     tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
                                     tg_msg = tg.format_auto_apply_update(job=job, result=res)

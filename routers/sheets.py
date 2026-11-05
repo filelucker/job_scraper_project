@@ -128,7 +128,7 @@ class GoogleSheetsRouter:
                 # Skip any job that was already finalized or attempted
                 if any(k in status_lower for k in ["apply via url", "applied", "skipped", "failed", "closed"]):
                     continue
-                if applied_at:
+                if applied_at and "applied" in status_lower:
                     continue
 
                 # Only pick up explicitly 'pending' or 'draft' jobs that have never been applied

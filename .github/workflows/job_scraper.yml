@@ -59,10 +59,11 @@ jobs:
           # Playwright & Headless Config
           BROWSER_HEADLESS: "true"
           JOB_LOOKBACK_HOURS: "6"
-          AUTO_APPLY_REPROCESS_UNAPPLIED: "false"
-          MAX_REPROCESS_JOBS: "5"
+          AUTO_APPLY_REPROCESS_UNAPPLIED: "true"
+          MAX_REPROCESS_JOBS: "20"
           MAX_AUTO_APPLY_PER_RUN: "100"
           TECTONIC_TIMEOUT: "60"
+          TELEGRAM_SEND_MANUAL_APPLY_ALERTS: "false"
 
           # Telegram Routing
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
