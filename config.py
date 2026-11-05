@@ -3030,6 +3030,96 @@ COMPANY_BOARDS = {
     'Baraka (UAE)': {'ats': 'ashby', 'token': 'baraka'},
     'Dapi (UAE)': {'ats': 'ashby', 'token': 'dapi'},
     'Bayzat (UAE)': {'ats': 'greenhouse', 'token': 'bayzat'},
+    # --- Fortune 500 & Global Enterprise Tech (Workday CXS API) ---
+    'Intel (Workday)': {'ats': 'workday', 'token': 'intel.wd1.myworkdayjobs.com/wday/cxs/intel/External'},
+    'Qualcomm (Workday)': {'ats': 'workday', 'token': 'qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External'},
+    'Broadcom (Workday)': {'ats': 'workday', 'token': 'broadcom.wd1.myworkdayjobs.com/wday/cxs/broadcom/External_Career_Site'},
+    'eBay (Workday)': {'ats': 'workday', 'token': 'ebay.wd5.myworkdayjobs.com/wday/cxs/ebay/apply'},
+    'Expedia Group (Workday)': {'ats': 'workday', 'token': 'expedia.wd5.myworkdayjobs.com/wday/cxs/expedia/external'},
+    'General Motors (Workday)': {'ats': 'workday', 'token': 'gm.wd5.myworkdayjobs.com/wday/cxs/gm/GM_Global_Careers'},
+    'Walt Disney Company (Workday)': {'ats': 'workday', 'token': 'disney.wd5.myworkdayjobs.com/wday/cxs/disney/disneycareers'},
+    'Nike (Workday)': {'ats': 'workday', 'token': 'nike.wd1.myworkdayjobs.com/wday/cxs/nike/NikeCareers'},
+    'CrowdStrike (Workday)': {'ats': 'workday', 'token': 'crowdstrike.wd5.myworkdayjobs.com/wday/cxs/crowdstrike/crowdstrikecareers'},
+    'Palo Alto Networks (Workday)': {'ats': 'workday', 'token': 'paloaltonetworks.wd1.myworkdayjobs.com/wday/cxs/paloaltonetworks/External'},
+    'Snap Inc (Workday)': {'ats': 'workday', 'token': 'snap.wd1.myworkdayjobs.com/wday/cxs/snap/Snap_Careers'},
+    'Workato (Workday)': {'ats': 'workday', 'token': 'workato.wd1.myworkdayjobs.com/wday/cxs/workato/Workato_Careers'},
+    'GoodRx (Workday)': {'ats': 'workday', 'token': 'goodrx.wd1.myworkdayjobs.com/wday/cxs/goodrx/Careers'},
+    'Grubhub (Workday)': {'ats': 'workday', 'token': 'wonder.wd1.myworkdayjobs.com/wday/cxs/wonder/Grubhub_Careers'},
+    'FlixBus (Workday)': {'ats': 'workday', 'token': 'flix.wd3.myworkdayjobs.com/wday/cxs/flix/Flix_Careers'},
+
+    # --- Big Tech & Global Talent Ecosystems (Eightfold via Jobhive) ---
+    'Netflix (Eightfold)': {'ats': 'eightfold', 'token': 'netflix'},
+
+    # --- Frontier AI, Foundation Models & LLM Infrastructure ---
+    'Hugging Face': {'ats': 'workable', 'token': 'huggingface'},
+    'Stability AI': {'ats': 'greenhouse', 'token': 'stabilityai'},
+    'Qdrant': {'ats': 'ashby', 'token': 'qdrant'},
+    'Tavily AI': {'ats': 'ashby', 'token': 'tavily'},
+    'Dagster Labs': {'ats': 'greenhouse', 'token': 'dagsterlabs'},
+    'dbt Labs': {'ats': 'greenhouse', 'token': 'dbtlabsinc'},
+    'Starburst Data': {'ats': 'greenhouse', 'token': 'starburst'},
+    'YugabyteDB': {'ats': 'greenhouse', 'token': 'yugabyte'},
+    'TimescaleDB': {'ats': 'ashby', 'token': 'timescale'},
+    'InfluxData': {'ats': 'ashby', 'token': 'influxdata'},
+    'Chronosphere': {'ats': 'ashby', 'token': 'chronosphere'},
+    'Honeycomb.io': {'ats': 'greenhouse', 'token': 'honeycomb'},
+    'Teleport': {'ats': 'lever', 'token': 'teleport'},
+    'ngrok': {'ats': 'greenhouse', 'token': 'ngrok'},
+    'Turso (ChiselStrike)': {'ats': 'ashby', 'token': 'chiselstrike'},
+    'OneSignal': {'ats': 'greenhouse', 'token': 'onesignal'},
+    'HashiCorp': {'ats': 'greenhouse', 'token': 'hashicorp'},
+    'Confluent': {'ats': 'greenhouse', 'token': 'confluent'},
+    'Couchbase': {'ats': 'greenhouse', 'token': 'couchbase'},
+    'Dynatrace': {'ats': 'greenhouse', 'token': 'dynatrace'},
+    'Splunk': {'ats': 'greenhouse', 'token': 'splunk'},
+
+    # --- Mobile App Leaders, Consumer Tech & Audio (iOS / Android / Flutter) ---
+    'Grindr': {'ats': 'ashby', 'token': 'grindr'},
+    'SoundCloud': {'ats': 'greenhouse', 'token': 'soundcloud'},
+    'Babylist': {'ats': 'greenhouse', 'token': 'babylist'},
+    'VSCO': {'ats': 'greenhouse', 'token': 'vsco'},
+    'Grammarly': {'ats': 'greenhouse', 'token': 'grammarly'},
+    'Pocket Casts': {'ats': 'greenhouse', 'token': 'pocketcasts'},
+    'Otter.ai': {'ats': 'greenhouse', 'token': 'otterai'},
+    'Lifesum': {'ats': 'teamtailor', 'token': 'lifesum'},
+    'Sleep Cycle': {'ats': 'teamtailor', 'token': 'sleepcycle'},
+    'Oura Health': {'ats': 'greenhouse', 'token': 'ouraring'},
+    'Wellhub': {'ats': 'greenhouse', 'token': 'gympass'},
+
+    # --- Global Remote Work, Payroll & Global HR Platforms ---
+    'Remote.com': {'ats': 'greenhouse', 'token': 'remotecom'},
+    'Oyster HR': {'ats': 'greenhouse', 'token': 'oysterhr'},
+    'Factorial (Spain HR)': {'ats': 'lever', 'token': 'factorial'},
+
+    # --- FinTech, Banking & Web3 / Crypto Champions ---
+    'Tide Bank': {'ats': 'greenhouse', 'token': 'tide'},
+    'OakNorth Bank': {'ats': 'lever', 'token': 'oaknorth'},
+    'WorldRemit': {'ats': 'smartrecruiters', 'token': 'WorldRemit'},
+    'Bitstamp': {'ats': 'workable', 'token': 'bitstamp'},
+    'Tether': {'ats': 'greenhouse', 'token': 'tether'},
+    'Nord Security (NordVPN)': {'ats': 'greenhouse', 'token': 'nordsecurity'},
+
+    # --- UAE, Middle East & MENA SuperApps & Scaleups ---
+    'Talabat (Delivery Hero/UAE)': {'ats': 'greenhouse', 'token': 'talabat'},
+    'Swvl (Mobility ME)': {'ats': 'lever', 'token': 'swvl'},
+    'Jahez (Saudi Arabia)': {'ats': 'greenhouse', 'token': 'jahez'},
+    'HungerStation (Saudi Arabia)': {'ats': 'greenhouse', 'token': 'hungerstation'},
+    'Floward (Flowers/Gifts ME)': {'ats': 'lever', 'token': 'floward'},
+    'Salla (Saudi E-Commerce)': {'ats': 'ashby', 'token': 'salla'},
+    'Zid (Saudi E-Commerce)': {'ats': 'ashby', 'token': 'zid'},
+
+    # --- European Champions & Scaleups (UK, Germany, France, Nordics) ---
+    'Just Eat Takeaway (Netherlands)': {'ats': 'smartrecruiters', 'token': 'JustEatTakeaway'},
+    'Tier Mobility (Dott/Germany)': {'ats': 'greenhouse', 'token': 'tiermobility'},
+    'Swappie (Finland)': {'ats': 'teamtailor', 'token': 'swappie'},
+    'Vinted (Lithuania)': {'ats': 'greenhouse', 'token': 'vinted'},
+    'Vestiaire Collective (France)': {'ats': 'smartrecruiters', 'token': 'VestiaireCollective'},
+    'ManoMano (France)': {'ats': 'smartrecruiters', 'token': 'ManoMano'},
+    'Babylon Health': {'ats': 'greenhouse', 'token': 'babylonhealth'},
+    'Agicap (France Cashflow)': {'ats': 'greenhouse', 'token': 'agicap'},
+    'TravelPerk (Spain Business Travel)': {'ats': 'greenhouse', 'token': 'travelperk'},
+    'Auto1 Group (Germany)': {'ats': 'smartrecruiters', 'token': 'AUTO1Group'},
+
 }
 
 # ==========================================
