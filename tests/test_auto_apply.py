@@ -143,7 +143,8 @@ class TestAutoApplyPipeline(unittest.TestCase):
             "filled_fields_count": 5,
             "resume_attached": True
         }
-        with patch.object(dispatcher.browser_applier, "apply", return_value=mock_browser_res):
+        with patch("services.apply_dispatcher.UrlResolver.resolve", return_value=web_job["URL"]), \
+             patch.object(dispatcher.browser_applier, "apply", return_value=mock_browser_res):
             res = dispatcher.process_job(web_job)
             self.assertEqual(res["status"], "Drafted (Web Form Filled)")
             self.assertTrue(res["success"])

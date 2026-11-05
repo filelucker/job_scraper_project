@@ -125,12 +125,13 @@ class LatexCompiler:
                 temp_dir
             ]
             
+            timeout_sec = int(os.getenv("TECTONIC_TIMEOUT", "60"))
             try:
                 res = subprocess.run(
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    timeout=15,
+                    timeout=timeout_sec,
                     check=True
                 )
                 generated_pdf = os.path.join(temp_dir, "resume.pdf")
@@ -140,7 +141,7 @@ class LatexCompiler:
                 return False
             except subprocess.TimeoutExpired:
                 self.compilation_failed = True
-                print("[LatexCompiler] Tectonic compilation timed out after 15s. Disabling further compilation attempts for this run to conserve pipeline budget; master resume will be used as fallback.")
+                print(f"[LatexCompiler] Tectonic compilation timed out after {timeout_sec}s. Disabling further compilation attempts for this run to conserve pipeline budget; master resume will be used as fallback.")
                 return False
             except subprocess.CalledProcessError as e:
                 err_output = e.stderr.decode('utf-8', errors='ignore')
