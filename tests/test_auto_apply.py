@@ -310,5 +310,41 @@ class TestAutoApplyPipeline(unittest.TestCase):
             cdp_applier = PlaywrightBrowserApplier(dry_run=True)
             self.assertEqual(cdp_applier.cdp_url, "ws://127.0.0.1:9222")
 
+    def test_10_url_resolver_indeed_linkedin_unwrapping(self):
+        from services.url_resolver import UrlResolver
+        from unittest.mock import patch, MagicMock
+
+        # 1. Test Indeed resolution with mock HTML containing ATS link in job description
+        indeed_html = """
+        <html>
+            <body>
+                <div id="jobDescriptionText">Please apply directly at https://boards.greenhouse.io/mytech/jobs/123456</div>
+            </body>
+        </html>
+        """
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = indeed_html
+
+        with patch("requests.Session.get", return_value=mock_resp):
+            resolved = UrlResolver._extract_from_indeed("https://www.indeed.com/viewjob?jk=abcdef123456")
+            self.assertEqual(resolved, "https://boards.greenhouse.io/mytech/jobs/123456")
+
+        # 2. Test LinkedIn externalApply parameter resolution
+        linkedin_html = """
+        <html>
+            <body>
+                <a class="apply-button" href="https://www.linkedin.com/jobs/view/externalApply/12345?url=https%3A%2F%2Fjobs.lever.co%2Fmyco%2F789">Apply</a>
+            </body>
+        </html>
+        """
+        mock_resp_li = MagicMock()
+        mock_resp_li.status_code = 200
+        mock_resp_li.text = linkedin_html
+
+        with patch("requests.Session.get", return_value=mock_resp_li):
+            resolved_li = UrlResolver._extract_from_linkedin("https://www.linkedin.com/jobs/view/12345")
+            self.assertEqual(resolved_li, "https://jobs.lever.co/myco/789")
+
 if __name__ == "__main__":
     unittest.main()

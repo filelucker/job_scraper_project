@@ -75,6 +75,21 @@ class UrlResolver:
                 extracted = cls._extract_from_ycombinator(url, timeout)
                 if extracted:
                     return extracted
+
+            if "indeed" in netloc:
+                extracted = cls._extract_from_indeed(url, timeout)
+                if extracted:
+                    return extracted
+
+            if "linkedin.com" in netloc:
+                extracted = cls._extract_from_linkedin(url, timeout)
+                if extracted:
+                    return extracted
+
+            if "glassdoor" in netloc:
+                extracted = cls._extract_from_glassdoor(url, timeout)
+                if extracted:
+                    return extracted
             # General redirect resolver
             resolved_url = cls._follow_redirects(url, timeout)
             if cls.is_direct_ats(resolved_url):
@@ -248,6 +263,160 @@ class UrlResolver:
                         pass
         except Exception as e:
             print(f"[UrlResolver] YC extraction notice: {e}")
+        return None
+
+    @classmethod
+    def _extract_from_indeed(cls, url: str, timeout: int = 12) -> Optional[str]:
+        """Resolves Indeed job URLs to direct canonical ATS or employer application links."""
+        try:
+            session = requests.Session()
+            session.headers.update(DEFAULT_HEADERS)
+            
+            # 1. Check for 'jk' job key to follow standard Indeed applystart redirect
+            m = re.search(r'[?&]jk=([a-zA-Z0-9]+)', url)
+            jk = m.group(1) if m else None
+            if jk:
+                applystart_url = f"https://www.indeed.com/applystart?jk={jk}"
+                try:
+                    followed = cls._follow_redirects(applystart_url, timeout=timeout)
+                    if followed and "indeed.com" not in (urlparse(followed).netloc or "").lower():
+                        return followed
+                except Exception:
+                    pass
+
+            # 2. Fetch Indeed job page and inspect DOM / JSON-LD / descriptions
+            resp = session.get(url, timeout=timeout)
+            if resp.status_code != 200:
+                return None
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # Check JSON-LD schema
+            for script in soup.find_all("script", type="application/ld+json"):
+                try:
+                    data = json.loads(script.string or "")
+                    if isinstance(data, dict) and data.get("@type") == "JobPosting":
+                        apply_url = data.get("directApply") or data.get("url")
+                        if apply_url and cls.is_direct_ats(str(apply_url)):
+                            return str(apply_url)
+                except Exception:
+                    pass
+
+            # Check outbound apply links
+            for a in soup.find_all("a", href=True):
+                href = a["href"].strip()
+                for domain in KNOWN_ATS_DOMAINS:
+                    if domain in href.lower():
+                        return href
+                if "applystart" in href:
+                    full_target = urljoin("https://www.indeed.com", href)
+                    followed = cls._follow_redirects(full_target, timeout=timeout)
+                    if followed and "indeed.com" not in (urlparse(followed).netloc or "").lower():
+                        return followed
+
+            # Check job description text for direct ATS links (e.g. Greenhouse/Lever/Workday links pasted in text)
+            desc_elem = soup.find(id=re.compile(r'jobDescriptionText|job_summary', re.I))
+            if desc_elem:
+                desc_text = desc_elem.get_text()
+                for domain in KNOWN_ATS_DOMAINS:
+                    url_match = re.search(rf'https?://[^\s<>"]*{re.escape(domain)}[^\s<>"]*', desc_text)
+                    if url_match:
+                        return url_match.group(0).rstrip('.,;()[]')
+
+        except Exception as e:
+            print(f"[UrlResolver] Indeed extraction notice: {e}")
+        return None
+
+    @classmethod
+    def _extract_from_linkedin(cls, url: str, timeout: int = 12) -> Optional[str]:
+        """Resolves public LinkedIn job postings to direct employer or ATS URLs."""
+        try:
+            session = requests.Session()
+            session.headers.update(DEFAULT_HEADERS)
+
+            # Extract job ID
+            m = re.search(r'/(?:jobs/view|currentJobId=)/?(\d+)', url)
+            job_id = m.group(1) if m else None
+
+            target_fetch_url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}" if job_id else url
+            resp = session.get(target_fetch_url, timeout=timeout)
+            if resp.status_code != 200:
+                resp = session.get(url, timeout=timeout)
+            if resp.status_code != 200:
+                return None
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # 1. Search for external apply links with encoded or redirected target URL
+            for a in soup.find_all("a", href=True):
+                href = a["href"].strip()
+                if "externalApply" in href or "apply-link-offsite" in str(a.get("data-tracking-control-name", "")):
+                    url_param = re.search(r'[?&]url=([^&]+)', href)
+                    if url_param:
+                        from urllib.parse import unquote
+                        decoded = unquote(url_param.group(1))
+                        if decoded and "linkedin.com" not in (urlparse(decoded).netloc or "").lower():
+                            return decoded
+                    followed = cls._follow_redirects(urljoin("https://www.linkedin.com", href), timeout=timeout)
+                    if followed and "linkedin.com" not in (urlparse(followed).netloc or "").lower():
+                        return followed
+
+                for domain in KNOWN_ATS_DOMAINS:
+                    if domain in href.lower():
+                        return href
+
+            # 2. Check JSON-LD
+            for script in soup.find_all("script", type="application/ld+json"):
+                try:
+                    data = json.loads(script.string or "")
+                    if isinstance(data, dict) and data.get("@type") == "JobPosting":
+                        apply_url = data.get("url") or data.get("sameAs")
+                        if apply_url and cls.is_direct_ats(str(apply_url)):
+                            return str(apply_url)
+                except Exception:
+                    pass
+
+            # 3. Check job description for ATS link
+            desc = soup.find(class_=re.compile(r'description|show-more-less-html', re.I))
+            if desc:
+                desc_text = desc.get_text()
+                for domain in KNOWN_ATS_DOMAINS:
+                    url_match = re.search(rf'https?://[^\s<>"]*{re.escape(domain)}[^\s<>"]*', desc_text)
+                    if url_match:
+                        return url_match.group(0).rstrip('.,;()[]')
+
+        except Exception as e:
+            print(f"[UrlResolver] LinkedIn extraction notice: {e}")
+        return None
+
+    @classmethod
+    def _extract_from_glassdoor(cls, url: str, timeout: int = 12) -> Optional[str]:
+        """Resolves Glassdoor job URLs to direct canonical ATS application links."""
+        try:
+            session = requests.Session()
+            session.headers.update(DEFAULT_HEADERS)
+            resp = session.get(url, timeout=timeout)
+            if resp.status_code != 200:
+                return None
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for a in soup.find_all("a", href=True):
+                href = a["href"].strip()
+                for domain in KNOWN_ATS_DOMAINS:
+                    if domain in href.lower():
+                        return href
+
+            for script in soup.find_all("script", type="application/ld+json"):
+                try:
+                    data = json.loads(script.string or "")
+                    if isinstance(data, dict) and data.get("@type") == "JobPosting":
+                        apply_url = data.get("url")
+                        if apply_url and cls.is_direct_ats(str(apply_url)):
+                            return str(apply_url)
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[UrlResolver] Glassdoor extraction notice: {e}")
         return None
 
     @classmethod
