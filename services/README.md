@@ -12,6 +12,7 @@ The `services` component package provides application execution, document genera
 - `class LeverApplier`: Headless Lever candidate submission engine (`apply_lever.py`).
   - `apply(job_url: str, pdf_path: str, comments: Optional[str] = None) -> Dict[str, Any]`: Dispatches multipart POST request with candidate profile and resume.
 - `class PlaywrightBrowserApplier`: Web automation applier (`apply_browser.py`).
+  - Supports Obscura-inspired anti-detection script injection (`Function.prototype.toString` trap, WebGL/WebGL2 vendor emulation, canvas and AudioContext micro-noise, and modern userAgentData client hints) and optional CDP server connection (`OBSCURA_CDP_URL` / `BROWSER_CDP_URL`).
   - `apply(job_url: str, pdf_path: str, mode: str = "review", screenshot_dir: str = "output_resumes/screenshots") -> Dict[str, Any]`: Automates browser navigation, stealth script injection, form inspection, field filling, screenshot capture, and auto-submission.
 - `class FormAgent`: Dynamic form inspection and field filling agent (`form_agent.py`).
   - `inspect_form(page) -> List[Dict[str, Any]]`: Scans DOM for interactive input controls.
@@ -25,7 +26,7 @@ The `services` component package provides application execution, document genera
   - `compile_pdf(latex_content: str, output_pdf_path: str) -> bool`: Executes Tectonic with a 15-second timeout and circuit breaker fallback.
 - `class CandidateProfile` & `get_candidate_profile()`: Structured candidate background loader (`profile_loader.py`).
 - `class UrlResolver`: Canonical ATS URL unwrapper (`url_resolver.py`).
-  - `resolve(url: str) -> str`: Follows HTTP redirects and extracts canonical ATS links from aggregators.
+  - `resolve(url: str) -> str`: Follows HTTP redirects and extracts canonical ATS links from aggregators including Indeed (`/applystart` and description links), LinkedIn (`externalApply` and guest APIs), Glassdoor, Arbeitnow, Jooble, and Y Combinator.
 
 ## Invariants
 - `AutoApplyDispatcher` enforces verified submission statuses: `Applied (Greenhouse API)`, `Applied (Lever API)`, `Applied (Direct Email)`, or `Applied (Web Portal)`. Jobs blocked by candidate logins or failed forms are never falsely marked as applied and return `Requires Manual Apply (...)`.

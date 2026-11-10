@@ -29,7 +29,7 @@ Matches and application statuses are synced in real time to **Google Sheets** wi
   - `JOB_LOOKBACK_HOURS`: Publication window (default: `6` hours).
   - `ONLY_REMOTE_OR_HYBRID`: Geography filter restricting matches to remote, hybrid, EU, or UAE locations.
   - `COMPANY_BOARDS`: Dictionary of 2,890+ companies mapped to ATS platform types and public board slugs (e.g. Greenhouse board slug `reddit`, Lever slug `anyscale`).
-  - Runtime flags: `AUTO_APPLY_ENABLED`, `AUTO_APPLY_MODE` (`auto`, `review`, `dry_run`), `BROWSER_HEADLESS`, `DRY_RUN`.
+  - Runtime flags: `AUTO_APPLY_ENABLED`, `AUTO_APPLY_MODE` (`auto`, `review`, `dry_run`), `BROWSER_HEADLESS`, `DRY_RUN`, `OBSCURA_CDP_URL` (optional external CDP browser endpoint).
 
 ### Local Invariants
 
@@ -44,7 +44,7 @@ Matches and application statuses are synced in real time to **Google Sheets** wi
 - [ai](./ai/README.md): AI-powered resume tailoring engine utilizing Google Gemini or OpenAI with deterministic rule-based heuristic fallback. Generates customized LaTeX summaries, competencies, skills, and pitch emails.
 - [handlers](./handlers/README.md): Modular scraping adapters, data models (`Job`, `BaseHandler`), and routing services (`JobEmailExtractor`) querying 2,890+ direct ATS boards, curated remote platforms, and aggregators.
 - [routers](./routers/README.md): External integration sinks managing Google Sheets live tracking (`GoogleSheetsRouter`), Telegram push notifications and document uploads (`TelegramRouter`), and SMTP email dispatch (`EmailRouter`).
-- [services](./services/README.md): Core execution services including multi-channel routing (`AutoApplyDispatcher`), direct ATS appliers (Greenhouse, Lever), Playwright browser agent (`PlaywrightBrowserApplier`), dynamic form inspection (`FormAgent`), CAPTCHA evasion (`CaptchaSolver`), LaTeX compilation (`LatexCompiler`), and canonical URL resolution (`UrlResolver`).
+- [services](./services/README.md): Core execution services including multi-channel routing (`AutoApplyDispatcher`), direct ATS appliers (Greenhouse, Lever), Playwright browser agent (`PlaywrightBrowserApplier`) equipped with Obscura-inspired engine stealth and optional CDP server connectivity, dynamic form inspection (`FormAgent`), CAPTCHA evasion (`CaptchaSolver`), LaTeX compilation (`LatexCompiler`), and canonical URL unwrapping (`UrlResolver` for Indeed, LinkedIn, Glassdoor, Arbeitnow, Jooble, and Y Combinator).
 - [templates](./templates/resume_template.tex): Master LaTeX CV template dynamically tailored per job listing.
 - [tests](./tests/): Comprehensive unit test suite covering pipeline orchestration, handlers, auto-apply dispatchers, and CAPTCHA solvers.
 - [.github](./.github/workflows/job_scraper.yml): Continuous Integration (CI) and automated scheduled deployment workflows.
@@ -116,11 +116,15 @@ job_scraper_project/
 │   └── README.md
 ├── templates/
 │   └── resume_template.tex         # Master LaTeX CV template
-├── tests/                          # 50 unit tests across pipeline, auto-apply, and solver suites
+├── tests/                          # 65 unit tests across pipeline, auto-apply, stealth, resolver, and solver suites
 │   ├── test_pipeline.py
 │   ├── test_auto_apply.py
 │   ├── test_automation.py
-│   └── test_captcha_solver.py
+│   ├── test_captcha_solver.py
+│   ├── test_endpoint_discovery.py
+│   ├── test_spec_runner.py
+│   ├── test_linkedin_direct.py
+│   └── test_wellfound_fallback.py
 └── .github/
     └── workflows/
         └── job_scraper.yml         # GitHub Actions automated scheduled pipeline
@@ -185,6 +189,8 @@ SENDER_NAME="Md Moniruzzaman"
 # Anti-Bot & Browser Automation
 BROWSER_HEADLESS=true
 PLAYWRIGHT_USER_DATA_DIR=output_resumes/browser_profile
+# Optional External CDP Server (e.g. Obscura daemon, remote Chrome DevTools, or Docker browser)
+# OBSCURA_CDP_URL=ws://127.0.0.1:9222
 # Optional paid CAPTCHA solvers (fallback for Turnstile/reCAPTCHA on datacenter IPs)
 CAPSOLVER_API_KEY=your_capsolver_key
 TWOCAPTCHA_API_KEY=your_2captcha_key
