@@ -54,62 +54,169 @@ class PlaywrightBrowserApplier:
             self.headless = True
 
         self.user_data_dir = os.getenv("PLAYWRIGHT_USER_DATA_DIR", user_data_dir)
+        self.cdp_url = os.getenv("OBSCURA_CDP_URL", os.getenv("BROWSER_CDP_URL", ""))
         self.profile = get_candidate_profile()
         self.form_agent = FormAgent()
         self.captcha_solver = CaptchaSolver()
 
     def _inject_stealth_scripts(self, page):
-        """Injects anti-detection scripts to mask automation flags."""
+        """Injects anti-detection scripts to mask automation flags using Obscura-style engine overrides."""
         if STEALTH_AVAILABLE:
             try:
                 stealth_sync(page)
             except Exception as e:
                 print(f"[BrowserApplier] Note: stealth_sync init: {e}")
 
-        # Advanced stealth overrides to defeat Cloudflare Turnstile & bot detection
+        # Obscura-inspired advanced stealth & anti-fingerprinting overrides to defeat Cloudflare Turnstile & bot detection
         stealth_js = """
         () => {
             try {
-                const newProto = navigator.__proto__;
-                delete newProto.webdriver;
-            } catch (e) {}
-            Object.defineProperty(Navigator.prototype, 'webdriver', {
-                get: () => undefined,
-                configurable: true
-            });
+                // 1. Native toString proxy trap (prevents Function.prototype.toString inspection from flagging patched functions)
+                const nativeToString = Function.prototype.toString;
+                const patchedFunctions = new WeakSet();
+                const makeNative = (fn, name) => {
+                    if (name) {
+                        try {
+                            Object.defineProperty(fn, 'name', { value: name, configurable: true });
+                        } catch (e) {}
+                    }
+                    patchedFunctions.add(fn);
+                    return fn;
+                };
 
-            window.chrome = {
-                runtime: {
-                    OnInstalledReason: { INSTALL: 'install', UPDATE: 'update', CHROME_UPDATE: 'chrome_update' },
-                    OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update' },
-                    PlatformArch: { ARM: 'arm', X86_32: 'x86-32', X86_64: 'x86-64' },
-                    PlatformNaclArch: { ARM: 'arm', X86_32: 'x86-32', X86_64: 'x86-64' },
-                    PlatformOs: { ANDROID: 'android', CROS: 'cros', LINUX: 'linux', MAC: 'mac', OPENBSD: 'openbsd', WIN: 'win' }
-                },
-                loadTimes: function() {},
-                csi: function() {},
-                app: {}
-            };
+                Function.prototype.toString = function() {
+                    if (patchedFunctions.has(this)) {
+                        return `function ${this.name || ''}() { [native code] }`;
+                    }
+                    return nativeToString.apply(this, arguments);
+                };
+                patchedFunctions.add(Function.prototype.toString);
 
-            if (window.navigator.permissions) {
-                const originalQuery = window.navigator.permissions.query;
-                window.navigator.permissions.query = (parameters) => (
-                    parameters && parameters.name === 'notifications'
-                        ? Promise.resolve({ state: Notification.permission })
-                        : originalQuery(parameters)
-                );
-            }
+                // 2. Hide navigator.webdriver
+                try {
+                    const newProto = navigator.__proto__;
+                    delete newProto.webdriver;
+                } catch (e) {}
+                Object.defineProperty(Navigator.prototype, 'webdriver', {
+                    get: makeNative(() => undefined, 'get webdriver'),
+                    configurable: true
+                });
 
-            Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5]
-            });
-            const getParameter = WebGLRenderingContext.prototype.getParameter;
-            WebGLRenderingContext.prototype.getParameter = function(parameter) {
-                if (parameter === 37445) return 'Intel Inc.';
-                if (parameter === 37446) return 'Intel Iris OpenGL Engine';
-                return getParameter.apply(this, arguments);
-            };
+                // 3. Realistic window.chrome runtime & app mocks
+                window.chrome = {
+                    runtime: {
+                        OnInstalledReason: { INSTALL: 'install', UPDATE: 'update', CHROME_UPDATE: 'chrome_update' },
+                        OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update' },
+                        PlatformArch: { ARM: 'arm', X86_32: 'x86-32', X86_64: 'x86-64' },
+                        PlatformNaclArch: { ARM: 'arm', X86_32: 'x86-32', X86_64: 'x86-64' },
+                        PlatformOs: { ANDROID: 'android', CROS: 'cros', LINUX: 'linux', MAC: 'mac', OPENBSD: 'openbsd', WIN: 'win' }
+                    },
+                    loadTimes: makeNative(function() {}, 'loadTimes'),
+                    csi: makeNative(function() {}, 'csi'),
+                    app: {
+                        isInstalled: false,
+                        InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+                        RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }
+                    }
+                };
+
+                // 4. Permissions API query mock
+                if (window.navigator.permissions) {
+                    const originalQuery = window.navigator.permissions.query;
+                    window.navigator.permissions.query = makeNative((parameters) => (
+                        parameters && parameters.name === 'notifications'
+                            ? Promise.resolve({ state: Notification.permission || 'default' })
+                            : originalQuery(parameters)
+                    ), 'query');
+                }
+
+                // 5. Hardware & Device specifications
+                try {
+                    Object.defineProperty(navigator, 'hardwareConcurrency', { get: makeNative(() => 8, 'get hardwareConcurrency'), configurable: true });
+                    Object.defineProperty(navigator, 'deviceMemory', { get: makeNative(() => 8, 'get deviceMemory'), configurable: true });
+                    Object.defineProperty(navigator, 'languages', { get: makeNative(() => ['en-US', 'en'], 'get languages'), configurable: true });
+                    Object.defineProperty(navigator, 'plugins', { get: makeNative(() => [1, 2, 3, 4, 5], 'get plugins'), configurable: true });
+                } catch (e) {}
+
+                // 6. WebGL & WebGL2 vendor/renderer emulation
+                const patchWebGL = (ctxProto) => {
+                    if (!ctxProto) return;
+                    const origGetParam = ctxProto.getParameter;
+                    ctxProto.getParameter = makeNative(function(parameter) {
+                        // UNMASKED_VENDOR_WEBGL
+                        if (parameter === 37445) return 'Google Inc. (Intel)';
+                        // UNMASKED_RENDERER_WEBGL
+                        if (parameter === 37446) return 'ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x000046A6) Direct3D11 vs_5_0 ps_5_0, D3D11)';
+                        return origGetParam.apply(this, arguments);
+                    }, 'getParameter');
+                };
+                patchWebGL(window.WebGLRenderingContext && window.WebGLRenderingContext.prototype);
+                patchWebGL(window.WebGL2RenderingContext && window.WebGL2RenderingContext.prototype);
+
+                // 7. Canvas Fingerprint Micro-Noise (Defeats hash-matching of headless Chrome)
+                if (window.HTMLCanvasElement && window.HTMLCanvasElement.prototype.toDataURL) {
+                    const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
+                    HTMLCanvasElement.prototype.toDataURL = makeNative(function() {
+                        try {
+                            const ctx = this.getContext('2d');
+                            if (ctx && this.width > 0 && this.height > 0) {
+                                const img = ctx.getImageData(0, 0, Math.min(this.width, 10), Math.min(this.height, 10));
+                                img.data[0] = (img.data[0] + 1) % 256;
+                                ctx.putImageData(img, 0, 0);
+                            }
+                        } catch (e) {}
+                        return origToDataURL.apply(this, arguments);
+                    }, 'toDataURL');
+                }
+
+                // 8. AudioContext Fingerprint Micro-Noise
+                if (window.AudioBuffer && window.AudioBuffer.prototype.getChannelData) {
+                    const origGetChannelData = AudioBuffer.prototype.getChannelData;
+                    AudioBuffer.prototype.getChannelData = makeNative(function(channel) {
+                        const data = origGetChannelData.apply(this, arguments);
+                        if (data && data.length > 5) {
+                            data[4] += 0.0000001;
+                        }
+                        return data;
+                    }, 'getChannelData');
+                }
+
+                // 9. Modern UserAgentData Client Hints
+                if (!navigator.userAgentData) {
+                    try {
+                        Object.defineProperty(navigator, 'userAgentData', {
+                            get: makeNative(() => ({
+                                brands: [
+                                    { brand: 'Chromium', version: '124' },
+                                    { brand: 'Google Chrome', version: '124' },
+                                    { brand: 'Not-A.Brand', version: '99' }
+                                ],
+                                mobile: false,
+                                platform: 'Windows',
+                                getHighEntropyValues: makeNative((hints) => Promise.resolve({
+                                    architecture: 'x86',
+                                    bitness: '64',
+                                    brands: [
+                                        { brand: 'Chromium', version: '124' },
+                                        { brand: 'Google Chrome', version: '124' },
+                                        { brand: 'Not-A.Brand', version: '99' }
+                                    ],
+                                    fullVersionList: [
+                                        { brand: 'Chromium', version: '124.0.6367.60' },
+                                        { brand: 'Google Chrome', version: '124.0.6367.60' },
+                                        { brand: 'Not-A.Brand', version: '99.0.0.0' }
+                                    ],
+                                    mobile: false,
+                                    model: '',
+                                    platform: 'Windows',
+                                    platformVersion: '15.0.0'
+                                }), 'getHighEntropyValues')
+                            }), 'get userAgentData'),
+                            configurable: true
+                        });
+                    } catch (e) {}
+                }
+            } catch (outerErr) {}
         }
         """
         try:
@@ -221,6 +328,22 @@ class PlaywrightBrowserApplier:
                 browser = None
 
                 def _launch_session(is_headless: bool):
+                    # Check for optional CDP browser connection (e.g. Obscura daemon or remote Chrome)
+                    cdp_url = os.getenv("OBSCURA_CDP_URL") or os.getenv("BROWSER_CDP_URL") or self.cdp_url
+                    if cdp_url:
+                        try:
+                            print(f"[BrowserApplier] Connecting to external CDP browser at {cdp_url} (Obscura/CDP)...")
+                            br = p.chromium.connect_over_cdp(cdp_url)
+                            ctx = br.contexts[0] if br.contexts else br.new_context(
+                                viewport={"width": 1280, "height": 800},
+                                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                                locale="en-US"
+                            )
+                            pg = ctx.pages[0] if ctx.pages else ctx.new_page()
+                            return ctx, br, pg
+                        except Exception as cdp_err:
+                            print(f"[BrowserApplier] Warning: CDP connection to {cdp_url} failed ({cdp_err}). Falling back to local Chromium...")
+
                     try:
                         os.makedirs(self.user_data_dir, exist_ok=True)
                         ctx = p.chromium.launch_persistent_context(

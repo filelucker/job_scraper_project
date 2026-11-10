@@ -279,5 +279,36 @@ class TestAutoApplyPipeline(unittest.TestCase):
             self.assertEqual(unapplied[0]["Company"], "C3")
             self.assertEqual(unapplied[1]["Company"], "C4")
 
+    def test_9_obscura_stealth_scripts_and_cdp_support(self):
+        from services.apply_browser import PlaywrightBrowserApplier
+        from unittest.mock import MagicMock, patch
+
+        applier = PlaywrightBrowserApplier(dry_run=True, headless=True)
+        self.assertIsNotNone(applier)
+
+        # 1. Verify _inject_stealth_scripts injects comprehensive anti-fingerprint script
+        class DummyPage:
+            def __init__(self):
+                self.injected_scripts = []
+            def add_init_script(self, script):
+                self.injected_scripts.append(script)
+
+        page = DummyPage()
+        applier._inject_stealth_scripts(page)
+        self.assertTrue(len(page.injected_scripts) > 0)
+        combined_scripts = "\n".join(page.injected_scripts)
+        self.assertIn("Function.prototype.toString", combined_scripts)
+        self.assertIn("navigator.webdriver", combined_scripts)
+        self.assertIn("WebGLRenderingContext", combined_scripts)
+        self.assertIn("WebGL2RenderingContext", combined_scripts)
+        self.assertIn("HTMLCanvasElement.prototype.toDataURL", combined_scripts)
+        self.assertIn("AudioBuffer.prototype.getChannelData", combined_scripts)
+        self.assertIn("userAgentData", combined_scripts)
+
+        # 2. Verify optional CDP connection parameter & environment handling
+        with patch.dict(os.environ, {"OBSCURA_CDP_URL": "ws://127.0.0.1:9222"}):
+            cdp_applier = PlaywrightBrowserApplier(dry_run=True)
+            self.assertEqual(cdp_applier.cdp_url, "ws://127.0.0.1:9222")
+
 if __name__ == "__main__":
     unittest.main()

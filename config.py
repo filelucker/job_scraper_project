@@ -3179,3 +3179,4 @@ _is_headless_env = (sys.platform.startswith("linux") and not os.getenv("DISPLAY"
 _default_browser_headless = "true" if _is_headless_env else "true"
 BROWSER_HEADLESS = os.getenv("BROWSER_HEADLESS", _default_browser_headless).lower() in ("true", "1", "yes")
 PLAYWRIGHT_USER_DATA_DIR = os.getenv("PLAYWRIGHT_USER_DATA_DIR", "output_resumes/browser_profile")
+OBSCURA_CDP_URL = os.getenv("OBSCURA_CDP_URL", os.getenv("BROWSER_CDP_URL", ""))
