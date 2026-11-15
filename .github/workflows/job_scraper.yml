@@ -4,8 +4,8 @@ on:
   push:
     branches: [ main ]
   schedule:
-    # Run every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
-    - cron: '0 */6 * * *'
+    # Run every 6 hours at off-peak minute 23 (00:23, 06:23, 12:23, 18:23 UTC) to avoid top-of-hour GitHub queue drops
+    - cron: '23 */6 * * *'
   workflow_dispatch:
     # Allows manual 1-click trigger from GitHub Actions tab
 
@@ -58,7 +58,7 @@ jobs:
         env:
           # Playwright & Headless Config
           BROWSER_HEADLESS: "true"
-          JOB_LOOKBACK_HOURS: "6"
+          JOB_LOOKBACK_HOURS: "12"
           AUTO_APPLY_REPROCESS_UNAPPLIED: "true"
           MAX_REPROCESS_JOBS: "20"
           MAX_AUTO_APPLY_PER_RUN: "100"
