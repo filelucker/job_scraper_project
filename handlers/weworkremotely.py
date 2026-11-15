@@ -33,7 +33,9 @@ class WeWorkRemotelyHandler(BaseHandler):
             "https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss",
             "https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss",
             "https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss",
-            "https://weworkremotely.com/categories/remote-devops-sysadmin.rss"
+            "https://weworkremotely.com/categories/remote-devops-sysadmin.rss",
+            "https://weworkremotely.com/categories/remote-product-jobs.rss",
+            "https://weworkremotely.com/categories/remote-design-jobs.rss"
         ]
 
     def fetch_raw_jobs(self) -> List[Dict[str, Any]]:

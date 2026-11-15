@@ -28,7 +28,7 @@ Matches and application statuses are synced in real time to **Google Sheets** wi
   - `COMPOUND_RULES`: Advanced boolean rules requiring title keywords AND context keywords (e.g. visa sponsorship, relocation).
   - `JOB_LOOKBACK_HOURS`: Publication window (default: `6` hours).
   - `ONLY_REMOTE_OR_HYBRID`: Geography filter restricting matches to remote, hybrid, EU, or UAE locations.
-  - `COMPANY_BOARDS`: Dictionary of 2,890+ companies mapped to ATS platform types and public board slugs (e.g. Greenhouse board slug `reddit`, Lever slug `anyscale`).
+  - `COMPANY_BOARDS`: Dictionary of 2,907+ companies mapped to ATS platform types and public board slugs (e.g. Greenhouse board slug `reddit`, Lever slug `anyscale`).
   - Runtime flags: `AUTO_APPLY_ENABLED`, `AUTO_APPLY_MODE` (`auto`, `review`, `dry_run`), `BROWSER_HEADLESS`, `DRY_RUN`, `OBSCURA_CDP_URL` (optional external CDP browser endpoint).
 
 ### Local Invariants
@@ -42,7 +42,7 @@ Matches and application statuses are synced in real time to **Google Sheets** wi
 ## Subdirectories & System Boundaries
 
 - [ai](./ai/README.md): AI-powered resume tailoring engine utilizing Google Gemini or OpenAI with deterministic rule-based heuristic fallback. Generates customized LaTeX summaries, competencies, skills, and pitch emails.
-- [handlers](./handlers/README.md): Modular scraping adapters, data models (`Job`, `BaseHandler`), and routing services (`JobEmailExtractor`) querying 2,890+ direct ATS boards, curated remote platforms, and aggregators.
+- [handlers](./handlers/README.md): Modular scraping adapters, data models (`Job`, `BaseHandler`), and routing services (`JobEmailExtractor`) querying 2,907+ direct ATS boards, curated remote platforms, and aggregators.
 - [routers](./routers/README.md): External integration sinks managing Google Sheets live tracking (`GoogleSheetsRouter`), Telegram push notifications and document uploads (`TelegramRouter`), and SMTP email dispatch (`EmailRouter`).
 - [services](./services/README.md): Core execution services including multi-channel routing (`AutoApplyDispatcher`), direct ATS appliers (Greenhouse, Lever), Playwright browser agent (`PlaywrightBrowserApplier`) equipped with Obscura-inspired engine stealth and optional CDP server connectivity, dynamic form inspection (`FormAgent`), CAPTCHA evasion (`CaptchaSolver`), LaTeX compilation (`LatexCompiler`), and canonical URL unwrapping (`UrlResolver` for Indeed, LinkedIn, Glassdoor, Arbeitnow, Jooble, and Y Combinator).
 - [templates](./templates/resume_template.tex): Master LaTeX CV template dynamically tailored per job listing.

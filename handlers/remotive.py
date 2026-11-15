@@ -29,21 +29,31 @@ class RemotiveHandler(BaseHandler):
         self.api_url = "https://remotive.com/api/remote-jobs"
 
     def fetch_raw_jobs(self) -> List[Dict[str, Any]]:
-        """Fetch remote engineering jobs from Remotive public REST API."""
-        try:
-            params = {"category": "software-dev"}
-            resp = requests.get(
-                self.api_url,
-                params=params,
-                headers={"User-Agent": "JobScraperBot/1.0"},
-                timeout=15
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data.get("jobs", [])
-        except Exception as e:
-            print(f"[Remotive] Error fetching jobs: {e}")
-            return []
+        """Fetch remote engineering, AI, data, and devops jobs from Remotive public REST API."""
+        categories = ["software-development", "artificial-intelligence", "data", "devops"]
+        all_jobs = []
+        seen_ids = set()
+
+        for cat in categories:
+            try:
+                params = {"category": cat, "limit": 100}
+                resp = requests.get(
+                    self.api_url,
+                    params=params,
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+                    timeout=15
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for job in data.get("jobs", []):
+                        jid = job.get("id") or job.get("url")
+                        if jid and jid not in seen_ids:
+                            seen_ids.add(jid)
+                            all_jobs.append(job)
+            except Exception as e:
+                print(f"[Remotive] Error fetching jobs for {cat}: {e}")
+
+        return all_jobs
 
     def parse_job(self, raw_job: Dict[str, Any]) -> Optional[Job]:
         title = raw_job.get("title")

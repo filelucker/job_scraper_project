@@ -47,8 +47,16 @@ class GermanTechJobsHandler(BaseHandler):
 
         target_urls = [
             "https://devitjobs.jobcopilot.com/api/jobs?country=de&visa=true",
+            "https://devitjobs.jobcopilot.com/api/jobs?country=ch&visa=true",
+            "https://devitjobs.jobcopilot.com/api/jobs?country=uk&visa=true",
+            "https://devitjobs.jobcopilot.com/api/jobs?country=nl&visa=true",
             "https://devitjobs.jobcopilot.com/jobs?country=de&visa=true",
-            "https://germantechjobs.de/jobs/all/Germany/visa-sponsorship"
+            "https://devitjobs.jobcopilot.com/jobs?country=ch&visa=true",
+            "https://devitjobs.jobcopilot.com/jobs?country=uk&visa=true",
+            "https://germantechjobs.de/jobs/all/Germany/visa-sponsorship",
+            "https://swissdevjobs.ch/jobs/all/Switzerland/visa-sponsorship",
+            "https://devitjobs.uk/jobs/all/UK/visa-sponsorship",
+            "https://devitjobs.nl/jobs/all/Netherlands/visa-sponsorship"
         ]
 
         raw_jobs = []

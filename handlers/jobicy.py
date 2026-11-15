@@ -29,21 +29,31 @@ class JobicyHandler(BaseHandler):
         self.api_url = "https://jobicy.com/api/v2/remote-jobs"
 
     def fetch_raw_jobs(self) -> List[Dict[str, Any]]:
-        """Fetch remote jobs from Jobicy public REST API."""
-        try:
-            params = {"count": 100, "industry": "engineering"}
-            resp = requests.get(
-                self.api_url,
-                params=params,
-                headers={"User-Agent": "JobScraperBot/1.0"},
-                timeout=15
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data.get("jobs", [])
-        except Exception as e:
-            print(f"[Jobicy] Error fetching jobs: {e}")
-            return []
+        """Fetch remote engineering, dev, and data-science jobs from Jobicy public REST API."""
+        industries = ["engineering", "dev", "data-science"]
+        all_jobs = []
+        seen_ids = set()
+
+        for ind in industries:
+            try:
+                params = {"count": 100, "industry": ind}
+                resp = requests.get(
+                    self.api_url,
+                    params=params,
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+                    timeout=15
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for job in data.get("jobs", []):
+                        jid = job.get("id") or job.get("url")
+                        if jid and jid not in seen_ids:
+                            seen_ids.add(jid)
+                            all_jobs.append(job)
+            except Exception as e:
+                print(f"[Jobicy] Error fetching jobs for {ind}: {e}")
+
+        return all_jobs
 
     def parse_job(self, raw_job: Dict[str, Any]) -> Optional[Job]:
         title = raw_job.get("jobTitle")

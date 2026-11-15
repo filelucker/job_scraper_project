@@ -162,6 +162,17 @@ INDEED_GLOBAL_DOMAINS = INDEED_CURATED_DOMAINS
 #
 COMPANY_BOARDS = {
 
+    # --- Frontier AI, Autonomous & Robotics ---
+    'Waymo': {'ats': 'greenhouse', 'token': 'waymo'},
+    'Nuro': {'ats': 'greenhouse', 'token': 'nuro'},
+    'Boston Dynamics': {'ats': 'workday', 'token': 'bostondynamics.wd1.myworkdayjobs.com/wday/cxs/bostondynamics/Boston_Dynamics'},
+    'Krea AI': {'ats': 'ashby', 'token': 'krea'},
+    'Plaud': {'ats': 'ashby', 'token': 'plaud'},
+    'Magic AI': {'ats': 'ashby', 'token': 'magic'},
+    'Svix': {'ats': 'ashby', 'token': 'svix'},
+    'Vannevar Labs': {'ats': 'greenhouse', 'token': 'vannevarlabs'},
+    'Epirus': {'ats': 'greenhouse', 'token': 'epirus'},
+
     # --- Frontier AI & Machine Learning (61) ---
     'Abridge': {'ats': 'ashby', 'token': 'abridge'},
     'Anthropic': {'ats': 'greenhouse', 'token': 'anthropic'},

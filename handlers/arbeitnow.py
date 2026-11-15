@@ -29,38 +29,49 @@ class ArbeitnowHandler(BaseHandler):
         self.api_url = "https://www.arbeitnow.com/api/job-board-api"
 
     def fetch_raw_jobs(self) -> List[Dict[str, Any]]:
-        """Fetch visa-sponsored jobs from Arbeitnow public REST API."""
+        """Fetch general tech and visa-sponsored jobs from Arbeitnow public REST API."""
         raw_jobs = []
-        # Query for visa sponsorship jobs
-        params = {"visa_sponsorship": "true"}
-        current_url = self.api_url
+        seen_slugs = set()
 
-        # Fetch up to 2 pages (approx 200 jobs) to cover recent postings
-        max_pages = 2
-        pages_fetched = 0
+        # Query both general European/remote tech listings and explicit visa sponsorship
+        query_configs = [
+            {"params": None, "max_pages": 2},
+            {"params": {"visa_sponsorship": "true"}, "max_pages": 1}
+        ]
 
-        while current_url and pages_fetched < max_pages:
-            try:
-                response = requests.get(
-                    current_url,
-                    params=params if pages_fetched == 0 else None,
-                    headers={"User-Agent": "JobScraperBot/1.0"},
-                    timeout=15
-                )
-                response.raise_for_status()
-                payload = response.json()
-                data = payload.get("data", [])
-                if not data:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+        for cfg in query_configs:
+            current_url = self.api_url
+            params = cfg["params"]
+            max_pages = cfg["max_pages"]
+            pages_fetched = 0
+
+            while current_url and pages_fetched < max_pages:
+                try:
+                    response = requests.get(
+                        current_url,
+                        params=params if pages_fetched == 0 else None,
+                        headers=headers,
+                        timeout=15
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                    data = payload.get("data", [])
+                    if not data:
+                        break
+                    for item in data:
+                        slug = item.get("slug") or item.get("url")
+                        if slug and slug not in seen_slugs:
+                            seen_slugs.add(slug)
+                            raw_jobs.append(item)
+
+                    links = payload.get("links", {})
+                    current_url = links.get("next")
+                    pages_fetched += 1
+                except Exception as e:
+                    print(f"[Arbeitnow] Error fetching jobs: {e}")
                     break
-                raw_jobs.extend(data)
-                
-                # Check for next page
-                links = payload.get("links", {})
-                current_url = links.get("next")
-                pages_fetched += 1
-            except Exception as e:
-                print(f"[Arbeitnow] Error fetching jobs: {e}")
-                break
 
         return raw_jobs
 
