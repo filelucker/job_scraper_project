@@ -486,6 +486,26 @@ class PlaywrightBrowserApplier:
                 is_simulation = (mode in ("review", "dry_run") or self.dry_run)
                 auto_submit = (mode == "auto" and not self.dry_run)
 
+                api_submission_ok = False
+                api_submission_msg = ""
+                def on_page_response(response):
+                    nonlocal api_submission_ok, api_submission_msg
+                    try:
+                        req = response.request
+                        if req.method in ("POST", "PUT"):
+                            u = response.url.lower()
+                            if any(k in u for k in ["/apply", "/applications", "/candidates", "/submission", "/jobs/", "/job_app"]):
+                                if response.status in (200, 201):
+                                    api_submission_ok = True
+                                    api_submission_msg = f"HTTP {response.status} from {response.url[:60]}"
+                    except Exception:
+                        pass
+
+                try:
+                    page.on("response", on_page_response)
+                except Exception:
+                    pass
+
                 fill_res = self.form_agent.fill_and_submit(
                     page=target_context,
                     controls=controls,
@@ -493,7 +513,8 @@ class PlaywrightBrowserApplier:
                     pdf_path=pdf_path,
                     auto_submit=auto_submit,
                     candidate=candidate,
-                    captcha_solver=self.captcha_solver
+                    captcha_solver=self.captcha_solver,
+                    api_submission_check=lambda: (api_submission_ok, api_submission_msg)
                 )
 
                 time.sleep(1)

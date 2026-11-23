@@ -44,7 +44,7 @@ Matches and application statuses are synced in real time to **Google Sheets** wi
 - [ai](./ai/README.md): AI-powered resume tailoring engine utilizing Google Gemini or OpenAI with deterministic rule-based heuristic fallback. Generates customized LaTeX summaries, competencies, skills, and pitch emails.
 - [handlers](./handlers/README.md): Modular scraping adapters, data models (`Job`, `BaseHandler`), and routing services (`JobEmailExtractor`) querying 2,907+ direct ATS boards, curated remote platforms, and aggregators.
 - [routers](./routers/README.md): External integration sinks managing Google Sheets live tracking (`GoogleSheetsRouter`), Telegram push notifications and document uploads (`TelegramRouter`), and SMTP email dispatch (`EmailRouter`).
-- [services](./services/README.md): Core execution services including multi-channel routing (`AutoApplyDispatcher`), direct ATS appliers (Greenhouse, Lever), Playwright browser agent (`PlaywrightBrowserApplier`) equipped with Obscura-inspired engine stealth and optional CDP server connectivity, dynamic form inspection (`FormAgent`), CAPTCHA evasion (`CaptchaSolver`), LaTeX compilation (`LatexCompiler`), and canonical URL unwrapping (`UrlResolver` for Indeed, LinkedIn, Glassdoor, Arbeitnow, Jooble, and Y Combinator).
+- [services](./services/README.md): Core execution services including multi-channel routing (`AutoApplyDispatcher`), direct ATS appliers (Greenhouse, Lever), Playwright browser agent (`PlaywrightBrowserApplier`) equipped with Obscura-inspired engine stealth and optional CDP server connectivity, dynamic form inspection and submission verification (`FormAgent`), automated email 2FA/security code extraction (`fetch_email_verification_code`), CAPTCHA evasion (`CaptchaSolver`), LaTeX compilation (`LatexCompiler`), and canonical URL unwrapping (`UrlResolver` for Indeed, LinkedIn, Glassdoor, Arbeitnow, Jooble, and Y Combinator).
 - [templates](./templates/resume_template.tex): Master LaTeX CV template dynamically tailored per job listing.
 - [tests](./tests/): Comprehensive unit test suite covering pipeline orchestration, handlers, auto-apply dispatchers, and CAPTCHA solvers.
 - [.github](./.github/workflows/job_scraper.yml): Continuous Integration (CI) and automated scheduled deployment workflows.
@@ -53,9 +53,9 @@ Matches and application statuses are synced in real time to **Google Sheets** wi
 
 ## Global Invariants
 
-- **Verified Submission Statuses**: Every application attempt is categorized by channel outcome. Genuinely completed applications receive `Applied (Greenhouse API)`, `Applied (Lever API)`, `Applied (Direct Email)`, or `Applied (Web Portal)` (verified form completion via Playwright agent). Login-gated aggregators (Indeed, LinkedIn, Glassdoor) or blocked forms receive `Requires Manual Apply (...)` with a tailored CV dispatched to Telegram. In `review` mode, processed applications receive `Drafted (Preview Generated)`.
+- **Verified Submission Statuses**: Every application attempt is categorized by genuine verified outcome. Applications only receive `Applied (Greenhouse API)`, `Applied (Lever API)`, `Applied (Direct Email)`, or `Applied (Web Portal)` when positive confirmation is validated (URL redirect, DOM success message, or HTTP 200/201 ATS API response). Login-gated aggregators (Indeed, LinkedIn, Glassdoor), security code challenges without IMAP, or CAPTCHA-gated forms receive `Requires Manual Apply (...)` with a tailored CV and 1-click apply card dispatched to Telegram. In `review` mode, processed applications receive `Drafted (Preview Generated)`.
 - **Strict Deduplication**: All discovered job listings must be normalized and deduplicated across existing Google Sheets records, local state cache (`scraped_jobs.json`), and the active run batch before queueing for auto-apply.
-- **CI Runtime Safety Guard**: The pipeline enforces a 15-minute runtime ceiling (`PIPELINE_MAX_RUN_SECONDS = 900`). If exceeded, remaining unapplied jobs in the queue receive the terminal status `Applied (Portal Dispatched - Batch Limit)` with direct application links dispatched to Telegram, gracefully releasing CI runner resources while preventing infinite re-queueing in subsequent runs.
+- **CI Runtime Safety Guard**: The pipeline enforces a 15-minute runtime ceiling (`PIPELINE_MAX_RUN_SECONDS = 900`). If exceeded, remaining unapplied jobs in the queue receive the status `Pending (Batch Time Limit - Unprocessed)` without stamping an unverified application timestamp, gracefully releasing CI runner resources while allowing reprocessing.
 - **Compiler Circuit Breaker**: `LatexCompiler` limits Tectonic compilation to 15 seconds. If a timeout occurs or Tectonic is unavailable, further compilation attempts for the run are disabled, falling back to [`master_resume.pdf`](./master_resume.pdf) to preserve execution budget.
 - **Timezone Consistency**: All timestamped records stored in Google Sheets use Bangladesh Standard Time (BST, UTC+6) in 12-hour AM/PM format, while internal `Job` representations and log outputs maintain UTC+6 timestamps.
 
@@ -110,13 +110,14 @@ job_scraper_project/
 │   ├── apply_greenhouse.py / apply_lever.py
 │   ├── apply_browser.py
 │   ├── form_agent.py
+│   ├── email_verifier.py
 │   ├── captcha_solver.py
 │   ├── compiler.py
 │   ├── profile_loader.py / url_resolver.py
 │   └── README.md
 ├── templates/
 │   └── resume_template.tex         # Master LaTeX CV template
-├── tests/                          # 65 unit tests across pipeline, auto-apply, stealth, resolver, and solver suites
+├── tests/                          # 66 unit tests across pipeline, auto-apply, stealth, resolver, and solver suites
 │   ├── test_pipeline.py
 │   ├── test_auto_apply.py
 │   ├── test_automation.py

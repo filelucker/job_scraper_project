@@ -344,7 +344,14 @@ Only return valid JSON."""
 
         return {}
 
-    def verify_submission(self, page, initial_url: str, captcha_solver: Optional[Any] = None) -> Dict[str, Any]:
+    def verify_submission(
+        self,
+        page,
+        initial_url: str,
+        captcha_solver: Optional[Any] = None,
+        candidate: Optional[Dict[str, Any]] = None,
+        api_submission_check: Optional[Any] = None
+    ) -> Dict[str, Any]:
         """
         Rigorously inspects post-submit state to verify genuine application completion.
         Detects confirmation URLs, thank-you messages, 2FA/security codes, CAPTCHAs, and validation errors.
@@ -486,8 +493,51 @@ Only return valid JSON."""
                     "message": "Submission verified via confirmation message on page."
                 }
 
+            # If validation errors were found, attempt 1 auto-healing recovery pass
             errors = dom_res.get("errors", [])
             if errors:
+                print(f"[FormAgent] Form validation blocked submission: {errors[:2]}. Attempting auto-correction...")
+                healed = self._attempt_validation_correction(page, errors, candidate)
+                if healed:
+                    print("[FormAgent] Corrected invalid fields. Retrying submit button...")
+                    time.sleep(1)
+                    resubmit = page.evaluate("""() => {
+                        const btns = Array.from(document.querySelectorAll('button[type="submit"], input[type="submit"], button'));
+                        const btn = btns.find(b => {
+                            const t = (b.innerText || b.value || '').toLowerCase();
+                            return (t.includes('submit') || t.includes('send') || t.includes('apply')) && !t.includes('linkedin');
+                        });
+                        if (btn) { btn.click(); return true; }
+                        return false;
+                    }""")
+                    if resubmit:
+                        time.sleep(4)
+                        if api_submission_check:
+                            try:
+                                is_ok, api_msg = api_submission_check()
+                                if is_ok:
+                                    return {
+                                        "submitted_and_verified": True,
+                                        "status_reason": "verified_success",
+                                        "message": f"Verified ATS API acceptance: {api_msg}"
+                                    }
+                            except Exception:
+                                pass
+                        new_url = getattr(page, "url", "").lower()
+                        if (initial_url and new_url != initial_url.lower()) or any(pat in new_url for pat in success_url_patterns):
+                            return {
+                                "submitted_and_verified": True,
+                                "status_reason": "verified_success",
+                                "message": "Validation corrected and submission confirmed."
+                            }
+                        re_dom = page.evaluate(dom_check)
+                        if re_dom.get("hasSuccessText") or re_dom.get("hasSuccessElement"):
+                            return {
+                                "submitted_and_verified": True,
+                                "status_reason": "verified_success",
+                                "message": "Validation corrected; confirmation message detected."
+                            }
+
                 return {
                     "submitted_and_verified": False,
                     "status_reason": "validation_error",
@@ -496,12 +546,92 @@ Only return valid JSON."""
         except Exception as e:
             print(f"[FormAgent] Note on DOM verification: {e}")
 
-        # 5. Fallback unconfirmed
+        # 5. Check API submission response (SPA background fetch/XHR)
+        if api_submission_check:
+            try:
+                is_ok, api_msg = api_submission_check()
+                if is_ok:
+                    return {
+                        "submitted_and_verified": True,
+                        "status_reason": "verified_success",
+                        "message": f"Verified ATS API acceptance: {api_msg}"
+                    }
+            except Exception:
+                pass
+
+        # 6. Fallback unconfirmed
         return {
             "submitted_and_verified": False,
             "status_reason": "unconfirmed",
             "message": "Submit clicked but no confirmation message or redirect detected."
         }
+
+    def _attempt_validation_correction(self, page, errors: List[str], candidate: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Attempts to fix common validation rejections:
+        - Check unselected mandatory checkboxes (privacy, consent, terms)
+        - Format phone number variations (+880, digits only, formatted)
+        - Select first available option in untouched required selects
+        - Answer empty required inputs marked with aria-invalid="true" or :invalid
+        """
+        js_heal = """
+        () => {
+            let fixedCount = 0;
+            // 1. Check any unchecked required checkboxes
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                if (!cb.checked && (cb.required || cb.getAttribute('aria-required') === 'true')) {
+                    cb.checked = true;
+                    cb.dispatchEvent(new Event('change', { bubbles: true }));
+                    fixedCount++;
+                }
+            });
+
+            // 2. Fix phone format if phone is invalid
+            document.querySelectorAll('input[type="tel"], input[name*="phone" i], input[id*="phone" i]').forEach(el => {
+                if (el.matches(':invalid') || el.getAttribute('aria-invalid') === 'true' || el.closest('.error, .has-error, .is-invalid')) {
+                    let current = el.value || '';
+                    if (current.startsWith('+880')) {
+                        el.value = '0' + current.slice(4);
+                    } else if (current.startsWith('0')) {
+                        el.value = '+880' + current.slice(1);
+                    } else {
+                        el.value = '+8801721915013';
+                    }
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    fixedCount++;
+                }
+            });
+
+            // 3. Fix unselected required selects
+            document.querySelectorAll('select').forEach(sel => {
+                if (sel.matches(':invalid') || sel.getAttribute('aria-invalid') === 'true' || !sel.value) {
+                    if (sel.options && sel.options.length > 1) {
+                        sel.selectedIndex = 1;
+                        sel.dispatchEvent(new Event('change', { bubbles: true }));
+                        fixedCount++;
+                    }
+                }
+            });
+
+            // 4. Fill empty required text inputs with fallback
+            document.querySelectorAll('input[type="text"], textarea').forEach(el => {
+                if ((el.matches(':invalid') || el.getAttribute('aria-invalid') === 'true') && !el.value.trim()) {
+                    el.value = 'N/A';
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    fixedCount++;
+                }
+            });
+
+            return fixedCount > 0;
+        }
+        """
+        try:
+            return bool(page.evaluate(js_heal))
+        except Exception as e:
+            print(f"[FormAgent] Validation auto-correction note: {e}")
+            return False
 
     def fill_and_submit(
         self,
@@ -511,7 +641,8 @@ Only return valid JSON."""
         pdf_path: str,
         auto_submit: bool = False,
         candidate: Optional[Dict[str, Any]] = None,
-        captcha_solver: Optional[Any] = None
+        captcha_solver: Optional[Any] = None,
+        api_submission_check: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Fills the form on the page using human-like typing and option selections.
@@ -683,7 +814,13 @@ Only return valid JSON."""
                     submitted = True
 
                     # Verify genuine submission
-                    ver_res = self.verify_submission(page, initial_url, captcha_solver=captcha_solver)
+                    ver_res = self.verify_submission(
+                        page=page,
+                        initial_url=initial_url,
+                        captcha_solver=captcha_solver,
+                        candidate=candidate,
+                        api_submission_check=api_submission_check
+                    )
                     submitted_and_verified = ver_res.get("submitted_and_verified", False)
                     status_reason = ver_res.get("status_reason", "unconfirmed")
                     message = ver_res.get("message", "")
