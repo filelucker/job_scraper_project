@@ -153,12 +153,11 @@ class AutoApplyDispatcher:
                 if channel == "GREENHOUSE" and res.get("success"):
                     status = "Applied (Greenhouse API)"
                     is_app = True
-                elif channel == "BROWSER" and (res.get("submitted") or res.get("filled_fields_count", 0) > 0):
+                elif channel == "BROWSER" and res.get("submitted_and_verified"):
                     status = "Applied (Web Portal)"
                     is_app = True
                 else:
-                    err = res.get("error", "API submission failed")
-                    status = f"Requires Manual Apply ({err[:40]})"
+                    status = res.get("status") or f"Requires Manual Apply ({res.get('error', 'Submission unconfirmed')[:35]})"
                     is_app = False
             else:
                 is_app = res.get("success", False)
@@ -194,12 +193,11 @@ class AutoApplyDispatcher:
                 if channel == "LEVER" and res.get("success"):
                     status = "Applied (Lever API)"
                     is_app = True
-                elif channel == "BROWSER" and (res.get("submitted") or res.get("filled_fields_count", 0) > 0):
+                elif channel == "BROWSER" and res.get("submitted_and_verified"):
                     status = "Applied (Web Portal)"
                     is_app = True
                 else:
-                    err = res.get("error", "API submission failed")
-                    status = f"Requires Manual Apply ({err[:40]})"
+                    status = res.get("status") or f"Requires Manual Apply ({res.get('error', 'Submission unconfirmed')[:35]})"
                     is_app = False
             else:
                 is_app = res.get("success", False)
@@ -239,12 +237,11 @@ class AutoApplyDispatcher:
                 if channel == "EMAIL" and res.get("success"):
                     status = "Applied (Direct Email)"
                     is_app = True
-                elif channel == "BROWSER" and (res.get("submitted") or res.get("filled_fields_count", 0) > 0):
+                elif channel == "BROWSER" and res.get("submitted_and_verified"):
                     status = "Applied (Web Portal)"
                     is_app = True
                 else:
-                    err = res.get("error", "Email delivery failed")
-                    status = f"Requires Manual Apply ({err[:40]})"
+                    status = res.get("status") or f"Requires Manual Apply ({res.get('error', 'Email delivery failed')[:35]})"
                     is_app = False
             else:
                 is_app = res.get("success", False)
@@ -265,16 +262,15 @@ class AutoApplyDispatcher:
                 mode=self.mode
             )
             is_success = res.get("success", False)
-            submitted = res.get("submitted", False)
+            submitted_and_verified = res.get("submitted_and_verified", False)
             filled_count = res.get("filled_fields_count", 0)
 
             if self.mode == "auto":
-                if submitted or filled_count > 0:
+                if submitted_and_verified:
                     status = "Applied (Web Portal)"
                     is_success = True
                 else:
-                    err = res.get("error")
-                    status = f"Requires Manual Apply ({err[:40]})" if err else "Requires Manual Apply (No Form Detected)"
+                    status = res.get("status") or "Requires Manual Apply (Submission Unconfirmed)"
                     is_success = False
             else:  # review or dry_run mode
                 if is_success or filled_count > 0:

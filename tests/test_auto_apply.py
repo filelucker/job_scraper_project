@@ -208,7 +208,7 @@ class TestAutoApplyPipeline(unittest.TestCase):
         }
         # Simulate Lever API failure escalating to successful browser applier
         with patch.object(dispatcher.lever_applier, "apply", return_value={"success": False, "error": "403 Cloudflare"}), \
-             patch.object(dispatcher.browser_applier, "apply", return_value={"success": True, "submitted": True, "filled_fields_count": 5}):
+             patch.object(dispatcher.browser_applier, "apply", return_value={"success": True, "submitted": True, "submitted_and_verified": True, "status": "Applied (Web Portal)", "filled_fields_count": 5}):
             res = dispatcher.process_job(lever_job)
             self.assertEqual(res["status"], "Applied (Web Portal)")
             self.assertTrue(res["success"])
@@ -221,7 +221,7 @@ class TestAutoApplyPipeline(unittest.TestCase):
             "Location": "Remote"
         }
         with patch.object(dispatcher.greenhouse_applier, "apply", return_value={"success": False, "error": "400 Bad Request"}), \
-             patch.object(dispatcher.browser_applier, "apply", return_value={"success": True, "submitted": True, "filled_fields_count": 6}):
+             patch.object(dispatcher.browser_applier, "apply", return_value={"success": True, "submitted": True, "submitted_and_verified": True, "status": "Applied (Web Portal)", "filled_fields_count": 6}):
             gh_res = dispatcher.process_job(gh_job)
             self.assertEqual(gh_res["status"], "Applied (Web Portal)")
             self.assertTrue(gh_res["success"])
@@ -345,6 +345,69 @@ class TestAutoApplyPipeline(unittest.TestCase):
         with patch("requests.Session.get", return_value=mock_resp_li):
             resolved_li = UrlResolver._extract_from_linkedin("https://www.linkedin.com/jobs/view/12345")
             self.assertEqual(resolved_li, "https://jobs.lever.co/myco/789")
+
+    def test_11_verification_and_false_positive_rejection(self):
+        from unittest.mock import patch, MagicMock
+        from services.form_agent import FormAgent
+
+        agent = FormAgent()
+
+        # 1. Unconfirmed submission must not produce verified success
+        class MockPageUnconfirmed:
+            url = "https://boards.greenhouse.io/sample/jobs/123"
+            def evaluate(self, script, *args):
+                if "isCodePrompt" in script:
+                    return {"isCodePrompt": False, "hasInput": False}
+                if "successPhrases" in script:
+                    return {"hasSuccessText": False, "hasSuccessElement": False, "errors": []}
+                return None
+
+        ver = agent.verify_submission(MockPageUnconfirmed(), initial_url="https://boards.greenhouse.io/sample/jobs/123")
+        self.assertFalse(ver["submitted_and_verified"])
+        self.assertEqual(ver["status_reason"], "unconfirmed")
+
+        # 2. Confirmed submission via redirect to thank you URL
+        class MockPageConfirmedRedirect:
+            url = "https://boards.greenhouse.io/sample/jobs/123/confirmation"
+            def evaluate(self, script, *args):
+                return None
+
+        ver_ok = agent.verify_submission(MockPageConfirmedRedirect(), initial_url="https://boards.greenhouse.io/sample/jobs/123")
+        self.assertTrue(ver_ok["submitted_and_verified"])
+        self.assertEqual(ver_ok["status_reason"], "verified_success")
+
+        # 3. Security code challenge detection (Greenhouse 2FA prompt)
+        class MockPageSecurityCode:
+            url = "https://boards.greenhouse.io/sample/jobs/123"
+            def evaluate(self, script, *args):
+                if "isCodePrompt" in script:
+                    return {"isCodePrompt": True, "hasInput": True}
+                return None
+
+        with patch("services.form_agent.fetch_email_verification_code", return_value=None):
+            ver_sec = agent.verify_submission(MockPageSecurityCode(), initial_url="https://boards.greenhouse.io/sample/jobs/123")
+            self.assertFalse(ver_sec["submitted_and_verified"])
+            self.assertEqual(ver_sec["status_reason"], "security_code_required")
+
+        # 4. AutoApplyDispatcher in mode="auto" with unconfirmed browser apply rejects false positive
+        dispatcher = AutoApplyDispatcher(mode="auto")
+        sample_job = {
+            "Title": "Senior Android Engineer",
+            "Company": "TestUnconfirmed",
+            "URL": "https://jobs.example.com/apply/123"
+        }
+        mock_unconfirmed_browser = {
+            "success": False,
+            "submitted": True,
+            "submitted_and_verified": False,
+            "status": "Requires Manual Apply (Submission Unconfirmed)",
+            "filled_fields_count": 4,
+            "resume_attached": True
+        }
+        with patch.object(dispatcher.browser_applier, "apply", return_value=mock_unconfirmed_browser):
+            res = dispatcher.process_job(sample_job)
+            self.assertFalse(res["success"])
+            self.assertEqual(res["status"], "Requires Manual Apply (Submission Unconfirmed)")
 
 if __name__ == "__main__":
     unittest.main()

@@ -492,7 +492,8 @@ class PlaywrightBrowserApplier:
                     answers=answers,
                     pdf_path=pdf_path,
                     auto_submit=auto_submit,
-                    candidate=candidate
+                    candidate=candidate,
+                    captcha_solver=self.captcha_solver
                 )
 
                 time.sleep(1)
@@ -501,28 +502,55 @@ class PlaywrightBrowserApplier:
                 filled_count = fill_res.get("filled_fields_count", 0)
                 resume_attached = fill_res.get("resume_attached", False)
                 submitted = fill_res.get("submitted", False)
+                submitted_and_verified = fill_res.get("submitted_and_verified", False)
+                status_reason = fill_res.get("status_reason", "unconfirmed")
+                message = fill_res.get("message", "")
 
                 if is_simulation:
                     submission_result = {
                         "success": (filled_count > 0 or resume_attached),
                         "mode": mode,
                         "dry_run": True,
+                        "submitted": False,
+                        "submitted_and_verified": False,
+                        "status": "Drafted (Web Form Filled)" if (filled_count > 0 or resume_attached) else "Requires Manual Apply (No Form Detected)",
                         "filled_fields_count": filled_count,
                         "resume_attached": resume_attached,
                         "screenshot_path": screenshot_file,
                         "message": f"Successfully drafted and filled {filled_count} fields. Screenshot saved for review."
                     }
                 else:
-                    is_auto_success = submitted or (filled_count > 0)
+                    if submitted_and_verified:
+                        status = "Applied (Web Portal)"
+                        is_success = True
+                    elif status_reason == "security_code_required":
+                        status = "Requires Manual Apply (Security Code Required)"
+                        is_success = False
+                    elif status_reason == "captcha_required":
+                        status = "Requires Manual Apply (CAPTCHA Challenge)"
+                        is_success = False
+                    elif status_reason == "validation_error":
+                        status = f"Requires Manual Apply ({message[:30]})"
+                        is_success = False
+                    elif submitted:
+                        status = "Requires Manual Apply (Submission Unconfirmed)"
+                        is_success = False
+                    else:
+                        status = "Requires Manual Apply (Form Incomplete)"
+                        is_success = False
+
                     submission_result = {
-                        "success": is_auto_success,
+                        "success": is_success,
                         "mode": "auto",
                         "dry_run": False,
+                        "status": status,
+                        "status_reason": status_reason,
                         "submitted": submitted,
+                        "submitted_and_verified": submitted_and_verified,
                         "filled_fields_count": filled_count,
                         "resume_attached": resume_attached,
                         "screenshot_path": screenshot_file,
-                        "message": "Application submitted successfully." if submitted else ("Form filled and submitted." if is_auto_success else "Form inspection found no interactive fields.")
+                        "message": message or status
                     }
 
                 try:

@@ -5,6 +5,7 @@ import random
 import time
 import requests
 from typing import Dict, Any, List, Optional
+from services.email_verifier import fetch_email_verification_code
 
 class FormAgent:
     """
@@ -21,7 +22,7 @@ class FormAgent:
         """
         Executes JavaScript on the page to extract all visible, actionable form controls.
         """
-        js_inspector = """
+        js_inspector = r"""
         () => {
             const controls = [];
             const isVisible = (elem) => {
@@ -47,12 +48,19 @@ class FormAgent:
                 return elem.getAttribute('placeholder') || elem.getAttribute('name') || elem.getAttribute('data-ui') || '';
             };
 
+            const escapeCss = (str) => {
+                if (window.CSS && CSS.escape) {
+                    try { return CSS.escape(str); } catch (e) {}
+                }
+                return String(str).replace(/([!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~])/g, '\\$1');
+            };
+
             const makeSelector = (el, fallbackTag, idx) => {
-                if (el.id) return `#${el.id}`;
-                if (el.name) return `[name="${el.name}"]`;
-                if (el.getAttribute('data-ui')) return `[data-ui="${el.getAttribute('data-ui')}"]`;
-                if (el.getAttribute('data-testid')) return `[data-testid="${el.getAttribute('data-testid')}"]`;
-                if (el.getAttribute('placeholder')) return `${fallbackTag}[placeholder="${el.getAttribute('placeholder')}"]`;
+                if (el.id) return `#${escapeCss(el.id)}`;
+                if (el.name) return `[name="${escapeCss(el.name)}"]`;
+                if (el.getAttribute('data-ui')) return `[data-ui="${escapeCss(el.getAttribute('data-ui'))}"]`;
+                if (el.getAttribute('data-testid')) return `[data-testid="${escapeCss(el.getAttribute('data-testid'))}"]`;
+                if (el.getAttribute('placeholder')) return `${fallbackTag}[placeholder="${escapeCss(el.getAttribute('placeholder'))}"]`;
                 return `${fallbackTag}:nth-of-type(${idx + 1})`;
             };
 
@@ -336,14 +344,185 @@ Only return valid JSON."""
 
         return {}
 
-    def fill_and_submit(self, page, controls: List[Dict[str, Any]], answers: Dict[str, Any], pdf_path: str, auto_submit: bool = False, candidate: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def verify_submission(self, page, initial_url: str, captcha_solver: Optional[Any] = None) -> Dict[str, Any]:
+        """
+        Rigorously inspects post-submit state to verify genuine application completion.
+        Detects confirmation URLs, thank-you messages, 2FA/security codes, CAPTCHAs, and validation errors.
+        """
+        current_url = getattr(page, "url", "") or ""
+        lower_url = current_url.lower()
+
+        # 1. URL-based Confirmation
+        success_url_patterns = [
+            "/thank", "/thanks", "/confirm", "/submitted", "/success",
+            "/application-complete", "/application_submitted", "/received", "/applied"
+        ]
+        if any(pat in lower_url for pat in success_url_patterns) and lower_url != (initial_url or "").lower():
+            return {
+                "submitted_and_verified": True,
+                "status_reason": "verified_success",
+                "message": f"Confirmed submission redirect: {current_url}"
+            }
+
+        # 2. Check for Security Code / 2FA Email Challenge (e.g. Greenhouse Airbnb prompt)
+        sec_code_check = """
+        () => {
+            const bodyText = document.body ? document.body.innerText.toLowerCase() : '';
+            const isCodePrompt = bodyText.includes('security code') ||
+                                 bodyText.includes('verification code') ||
+                                 bodyText.includes('enter the code') ||
+                                 bodyText.includes('code sent to') ||
+                                 bodyText.includes('we sent a code') ||
+                                 bodyText.includes('resubmit your application');
+            const codeInput = document.querySelector('input[name*="code" i], input[id*="code" i], input[placeholder*="code" i], #verification_code');
+            return { isCodePrompt: isCodePrompt, hasInput: !!codeInput };
+        }
+        """
+        try:
+            sec_info = page.evaluate(sec_code_check)
+            if sec_info and (sec_info.get("isCodePrompt") or sec_info.get("hasInput")):
+                print("[FormAgent] ATS 2FA/Security Code challenge detected on page. Attempting retrieval via IMAP...")
+                code = fetch_email_verification_code(max_wait_sec=20)
+                if code:
+                    print(f"[FormAgent] Retrieved security code ({code}) from email. Filling code...")
+                    filled_code = page.evaluate("""(c) => {
+                        const input = document.querySelector('input[name*="code" i], input[id*="code" i], input[placeholder*="code" i], #verification_code');
+                        if (input) {
+                            input.value = c;
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                            return true;
+                        }
+                        return false;
+                    }""", code)
+                    if filled_code:
+                        time.sleep(0.5)
+                        # Click verify / submit
+                        resubmit_clicked = page.evaluate("""() => {
+                            const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+                            const btn = btns.find(b => {
+                                const t = (b.innerText || b.value || '').toLowerCase();
+                                return t.includes('submit') || t.includes('verify') || t.includes('continue');
+                            });
+                            if (btn) { btn.click(); return true; }
+                            return false;
+                        }""")
+                        if resubmit_clicked:
+                            time.sleep(4)
+                            new_url = getattr(page, "url", "").lower()
+                            if any(pat in new_url for pat in success_url_patterns):
+                                return {
+                                    "submitted_and_verified": True,
+                                    "status_reason": "verified_success",
+                                    "message": "Security code verified; submission complete."
+                                }
+
+                return {
+                    "submitted_and_verified": False,
+                    "status_reason": "security_code_required",
+                    "message": "ATS email security code required (e.g. Greenhouse 2FA challenge)."
+                }
+        except Exception as e:
+            print(f"[FormAgent] Note on security code check: {e}")
+
+        # 3. Check for Post-Submit CAPTCHA Challenge
+        if captcha_solver:
+            try:
+                if (hasattr(captcha_solver, "_has_turnstile") and captcha_solver._has_turnstile(page)) or \
+                   (hasattr(captcha_solver, "_has_recaptcha") and captcha_solver._has_recaptcha(page)) or \
+                   (hasattr(captcha_solver, "_has_hcaptcha") and captcha_solver._has_hcaptcha(page)):
+                    print("[FormAgent] Post-submit CAPTCHA detected. Attempting resolution...")
+                    solved = captcha_solver.solve_if_present(page, max_wait_sec=6)
+                    if solved:
+                        time.sleep(2)
+                    else:
+                        return {
+                            "submitted_and_verified": False,
+                            "status_reason": "captcha_required",
+                            "message": "Application blocked by post-submit CAPTCHA challenge."
+                        }
+            except Exception:
+                pass
+
+        # 4. Check DOM for Success Content or Validation Errors
+        dom_check = """
+        () => {
+            const bodyText = document.body ? document.body.innerText.toLowerCase() : '';
+            const successPhrases = [
+                'thank you for applying',
+                'application submitted',
+                'your application has been submitted',
+                'we have received your application',
+                'we\\'ve received your application',
+                'application received',
+                'successfully submitted',
+                'thanks for applying',
+                'your application was sent',
+                'application complete'
+            ];
+            const hasSuccessText = successPhrases.some(phrase => bodyText.includes(phrase));
+            const successEl = document.querySelector('#application_confirmation, .application-confirmation, .application-success, [data-ui="submission-success"], [data-qa="submission-success"]');
+            
+            // Check for validation errors
+            const errorEls = Array.from(document.querySelectorAll('[aria-invalid="true"], .error-message, .field-error, .form-error, .alert-danger, .invalid-feedback'));
+            const visibleErrors = errorEls.filter(el => {
+                const style = window.getComputedStyle(el);
+                return style.display !== 'none' && style.visibility !== 'hidden' && (el.innerText || '').trim().length > 0;
+            }).map(el => (el.innerText || '').trim().substring(0, 80));
+
+            return {
+                hasSuccessText: hasSuccessText,
+                hasSuccessElement: !!successEl,
+                errors: visibleErrors
+            };
+        }
+        """
+        try:
+            dom_res = page.evaluate(dom_check)
+            if dom_res.get("hasSuccessText") or dom_res.get("hasSuccessElement"):
+                return {
+                    "submitted_and_verified": True,
+                    "status_reason": "verified_success",
+                    "message": "Submission verified via confirmation message on page."
+                }
+
+            errors = dom_res.get("errors", [])
+            if errors:
+                return {
+                    "submitted_and_verified": False,
+                    "status_reason": "validation_error",
+                    "message": f"Validation errors: {'; '.join(errors[:2])}"
+                }
+        except Exception as e:
+            print(f"[FormAgent] Note on DOM verification: {e}")
+
+        # 5. Fallback unconfirmed
+        return {
+            "submitted_and_verified": False,
+            "status_reason": "unconfirmed",
+            "message": "Submit clicked but no confirmation message or redirect detected."
+        }
+
+    def fill_and_submit(
+        self,
+        page,
+        controls: List[Dict[str, Any]],
+        answers: Dict[str, Any],
+        pdf_path: str,
+        auto_submit: bool = False,
+        candidate: Optional[Dict[str, Any]] = None,
+        captcha_solver: Optional[Any] = None
+    ) -> Dict[str, Any]:
         """
         Fills the form on the page using human-like typing and option selections.
-        Attaches the PDF resume. Handles multi-step form progression and submits.
+        Attaches the PDF resume. Handles multi-step form progression, submits, and verifies completion.
         """
         filled_count = 0
         resume_attached = False
         submitted = False
+        submitted_and_verified = False
+        status_reason = "unconfirmed"
+        message = ""
         action_type = "none"
 
         button_selectors = [
@@ -404,6 +583,13 @@ Only return valid JSON."""
                             elem.click()
                             elem.fill("")
                             elem.type(str(answer), delay=random.randint(10, 30))
+                            try:
+                                page.evaluate("""(el) => {
+                                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                                }""", elem)
+                            except Exception:
+                                pass
                             filled_count += 1
                             time.sleep(random.uniform(0.05, 0.2))
 
@@ -412,6 +598,12 @@ Only return valid JSON."""
                         if answer:
                             elem.scroll_into_view_if_needed()
                             elem.select_option(value=str(answer))
+                            try:
+                                page.evaluate("""(el) => {
+                                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                                }""", elem)
+                            except Exception:
+                                pass
                             filled_count += 1
 
                     elif kind == "checkbox":
@@ -442,6 +634,10 @@ Only return valid JSON."""
                     candidate_btn = page.query_selector(b_sel)
                     if candidate_btn and candidate_btn.is_visible():
                         btn_text = (candidate_btn.inner_text() or "").lower()
+                        # Ignore third-party oauth/autofill triggers
+                        if any(x in btn_text for x in ["apply with linkedin", "apply with indeed", "apply with google", "autofill with resume", "sign in"]):
+                            continue
+
                         if any(t in btn_text for t in ["next", "continue", "proceed", "save and continue"]):
                             action_type = "next_step"
                         else:
@@ -471,7 +667,8 @@ Only return valid JSON."""
 
             elif action_type == "submit":
                 if auto_submit:
-                    print(f"[FormAgent] Clicking submit application button...")
+                    print(f"[FormAgent] Submitting application...")
+                    initial_url = getattr(page, "url", "")
                     try:
                         submit_btn.scroll_into_view_if_needed()
                         submit_btn.click(timeout=6000)
@@ -484,11 +681,20 @@ Only return valid JSON."""
                         pass
                     time.sleep(2)
                     submitted = True
+
+                    # Verify genuine submission
+                    ver_res = self.verify_submission(page, initial_url, captcha_solver=captcha_solver)
+                    submitted_and_verified = ver_res.get("submitted_and_verified", False)
+                    status_reason = ver_res.get("status_reason", "unconfirmed")
+                    message = ver_res.get("message", "")
                 break
 
         return {
             "filled_fields_count": filled_count,
             "resume_attached": resume_attached,
             "action_type": action_type,
-            "submitted": submitted
+            "submitted": submitted,
+            "submitted_and_verified": submitted_and_verified,
+            "status_reason": status_reason,
+            "message": message
         }

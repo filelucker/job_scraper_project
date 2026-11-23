@@ -199,9 +199,12 @@ class GoogleSheetsRouter:
                 
                 contact_email = job.get("Contact Email") or job.get("email", "")
                 status = job.get("Application Status") or job.get("Status") or job.get("status") or job.get("initial_status", "Pending")
-                applied_at = job.get("Applied At") or job.get("applied_at") or ""
-                if not applied_at and any(k in status.lower() for k in ("applied", "draft", "fail", "error", "manual", "apply via")):
-                    applied_at = self._current_bst_timestamp()
+                applied_at = job.get("Applied At") or job.get("applied_at")
+                if applied_at is None:
+                    if status.lower().startswith("applied") and not any(k in status.lower() for k in ("fail", "error", "manual", "batch limit", "unconfirmed", "pending", "require", "draft")):
+                        applied_at = self._current_bst_timestamp()
+                    else:
+                        applied_at = ""
 
                 rows_to_append.append([
                     job.get("Company", ""),
@@ -254,7 +257,10 @@ class GoogleSheetsRouter:
                 return False
 
             row = cell.row
-            timestamp = applied_at or self._current_bst_timestamp()
+            if applied_at is not None:
+                timestamp = applied_at
+            else:
+                timestamp = self._current_bst_timestamp() if status.lower().startswith("applied") and not any(k in status.lower() for k in ("fail", "error", "manual", "batch limit", "unconfirmed", "pending", "require", "draft")) else ""
 
             # Prepare batch update for columns 8 (H), 9 (I), 10 (J)
             updates = []

@@ -479,11 +479,11 @@ def main():
                             rem_company = rem_job.get("Company", "Company")
                             timestamp = datetime.now(bst_tz).strftime("%Y-%m-%d %I:%M:%S %p BST")
 
-                            limit_status = "Applied (Portal Dispatched - Batch Limit)" if AUTO_APPLY_MODE == "auto" else "Drafted (Batch Time Limit)"
+                            limit_status = "Pending (Batch Time Limit - Unprocessed)"
                             rem_job["Status"] = limit_status
                             rem_job["status"] = limit_status
                             rem_job["Application Status"] = limit_status
-                            rem_job["Applied At"] = timestamp
+                            rem_job["Applied At"] = ""
 
                             # Sync to Google Sheets immediately
                             if sheets_active and GOOGLE_CREDENTIALS_JSON and rem_url:
@@ -493,14 +493,12 @@ def main():
                                             job_url=rem_url,
                                             status=limit_status,
                                             contact_email=rem_job.get("Contact Email", ""),
-                                            applied_at=timestamp
+                                            applied_at=""
                                         )
                                     else:
                                         sheets_router.append_jobs([rem_job])
                                         existing_urls.append(rem_url)
                                         appended_in_run_urls.add(rem_url)
-                                    if 'already_applied_urls' in locals():
-                                        already_applied_urls.add(rem_url)
                                 except Exception as sync_err:
                                     print(f"[Google Sheets Router] Error syncing batch limit job {rem_company}: {sync_err}")
 
@@ -510,7 +508,7 @@ def main():
                                     tg = TelegramRouter(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
                                     batch_res = {
                                         "channel": "MANUAL_URL",
-                                        "success": (AUTO_APPLY_MODE == "auto"),
+                                        "success": False,
                                         "status": limit_status,
                                         "details": {"notice": "Pipeline runtime budget reached; direct application link dispatched."}
                                     }
@@ -536,9 +534,13 @@ def main():
                         # Determine if application succeeded automatically without human intervention
                         status_lower = status_text.lower()
                         is_applied = (
-                            res.get("success", False)
-                            or status_lower.startswith("applied")
-                        ) and not any(x in status_lower for x in ("draft", "fail", "error", "manual", "batch limit"))
+                            (res.get("submitted_and_verified", False) or res.get("success", False))
+                            and status_lower.startswith("applied")
+                        ) and not any(x in status_lower for x in ("draft", "fail", "error", "manual", "batch limit", "unconfirmed", "pending", "require"))
+
+                        if not is_applied:
+                            job["Applied At"] = ""
+                            timestamp = ""
 
                         # Persist to Google Sheets immediately so progress is never lost
                         if sheets_active and GOOGLE_CREDENTIALS_JSON and url:
@@ -655,11 +657,14 @@ def main():
                         u_company = ujob.get("Company", "Company")
                         try:
                             res = dispatcher.process_job(ujob)
-                            u_status = res.get("status", "Applied (Web Portal)")
+                            u_status = res.get("status", "Requires Manual Apply (Unconfirmed)")
+                            u_verified = res.get("submitted_and_verified", False) or (res.get("success", False) and u_status.lower().startswith("applied") and not any(x in u_status.lower() for x in ("draft", "fail", "error", "manual", "batch limit", "unconfirmed", "pending", "require")))
+                            u_timestamp = datetime.now(bst_tz).strftime("%Y-%m-%d %I:%M:%S %p BST") if u_verified else ""
                             sheets_router.update_application_status(
                                 job_url=u_url,
                                 status=u_status,
-                                contact_email=ujob.get("Contact Email", "")
+                                contact_email=ujob.get("Contact Email", ""),
+                                applied_at=u_timestamp
                             )
                         except Exception as e:
                             clean_err = str(e).replace('\n', ' ')[:60]
@@ -789,14 +794,14 @@ def main():
                 applied_new_jobs = [
                     j for j in active_new_jobs
                     if str(j.get("Application Status", "") or j.get("Status", "")).lower().startswith("applied")
-                    and not any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("fail", "error", "manual"))
+                    and not any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("fail", "error", "manual", "batch limit", "unconfirmed", "pending", "require", "draft"))
                 ]
                 total_applied = len(applied_new_jobs)
 
                 manual_new_jobs = [
                     j for j in active_new_jobs
                     if j not in applied_new_jobs
-                    and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("manual", "draft", "review", "batch limit", "login", "apply via"))
+                    and any(k in str(j.get("Application Status", "") or j.get("Status", "")).lower() for k in ("manual", "draft", "review", "batch limit", "login", "apply via", "unconfirmed", "pending", "require"))
                 ]
                 total_drafted = len(manual_new_jobs)
 
