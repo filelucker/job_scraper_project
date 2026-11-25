@@ -458,7 +458,7 @@ def main():
             if dispatcher:
                 bst_tz = timezone(timedelta(hours=6))
                 appended_in_run_urls = set()
-                pipeline_max_run_seconds = int(os.getenv("PIPELINE_MAX_RUN_SECONDS", "1500"))  # 25 mins default
+                pipeline_max_run_seconds = int(os.getenv("PIPELINE_MAX_RUN_SECONDS", "0"))  # 0 = no soft batch limit
                 send_manual_alerts = os.getenv("TELEGRAM_SEND_MANUAL_APPLY_ALERTS", "false").lower() in ("true", "1", "yes")
 
                 for idx, job in enumerate(jobs_to_apply):
@@ -466,9 +466,9 @@ def main():
                     title = job.get("Title", "Job")
                     url = job.get("URL", "")
 
-                    # Check runtime safety budget to prevent CI runner timeouts
+                    # Check runtime safety budget if enabled (> 0) to prevent CI runner timeouts
                     elapsed_seconds = (datetime.now() - start_time).total_seconds()
-                    if elapsed_seconds > pipeline_max_run_seconds:
+                    if pipeline_max_run_seconds > 0 and elapsed_seconds > pipeline_max_run_seconds:
                         remaining_jobs = jobs_to_apply[idx:]
                         print(
                             f"\n[Auto-Apply] Safety time budget reached ({elapsed_seconds:.1f}s > {pipeline_max_run_seconds}s). "

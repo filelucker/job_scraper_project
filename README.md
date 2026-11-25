@@ -55,7 +55,7 @@ Matches and application statuses are synced in real time to **Google Sheets** wi
 
 - **Verified Submission Statuses**: Every application attempt is categorized by genuine verified outcome. Applications only receive `Applied (Greenhouse API)`, `Applied (Lever API)`, `Applied (Direct Email)`, or `Applied (Web Portal)` when positive confirmation is validated (URL redirect, DOM success message, or HTTP 200/201 ATS API response). Login-gated aggregators (Indeed, LinkedIn, Glassdoor), security code challenges without IMAP, or CAPTCHA-gated forms receive `Requires Manual Apply (...)` with a tailored CV and 1-click apply card dispatched to Telegram. In `review` mode, processed applications receive `Drafted (Preview Generated)`.
 - **Strict Deduplication**: All discovered job listings must be normalized and deduplicated across existing Google Sheets records, local state cache (`scraped_jobs.json`), and the active run batch before queueing for auto-apply.
-- **CI Runtime Safety Guard**: The pipeline enforces a 15-minute runtime ceiling (`PIPELINE_MAX_RUN_SECONDS = 900`). If exceeded, remaining unapplied jobs in the queue receive the status `Pending (Batch Time Limit - Unprocessed)` without stamping an unverified application timestamp, gracefully releasing CI runner resources while allowing reprocessing.
+- **CI Runtime Safety Guard**: `PIPELINE_MAX_RUN_SECONDS` defaults to `0` (disabled) so the full batch processes to completion within the 180-minute GitHub Actions runner ceiling. If set to a positive integer, remaining unapplied jobs receive `Pending (Batch Time Limit - Unprocessed)` without stamping an unverified application timestamp.
 - **Compiler Circuit Breaker**: `LatexCompiler` limits Tectonic compilation to 15 seconds. If a timeout occurs or Tectonic is unavailable, further compilation attempts for the run are disabled, falling back to [`master_resume.pdf`](./master_resume.pdf) to preserve execution budget.
 - **Timezone Consistency**: All timestamped records stored in Google Sheets use Bangladesh Standard Time (BST, UTC+6) in 12-hour AM/PM format, while internal `Job` representations and log outputs maintain UTC+6 timestamps.
 
@@ -197,7 +197,7 @@ CAPSOLVER_API_KEY=your_capsolver_key
 TWOCAPTCHA_API_KEY=your_2captcha_key
 
 # Pipeline Safety & Lookback Window
-PIPELINE_MAX_RUN_SECONDS=900              # Maximum pipeline execution ceiling in seconds (15 mins)
+PIPELINE_MAX_RUN_SECONDS=0                # 0 = disable soft batch limit (set > 0 in seconds to cap runtime)
 JOB_LOOKBACK_HOURS=6                      # Scan postings from the last 6 hours
 ```
 

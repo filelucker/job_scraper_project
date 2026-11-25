@@ -12,7 +12,7 @@ on:
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 180
 
     steps:
       - name: Checkout Repository
@@ -54,7 +54,7 @@ jobs:
         run: python -m unittest discover tests
 
       - name: Execute Pipeline
-        timeout-minutes: 30
+        timeout-minutes: 170
         env:
           # Playwright & Headless Config
           BROWSER_HEADLESS: "true"
@@ -62,7 +62,7 @@ jobs:
           AUTO_APPLY_REPROCESS_UNAPPLIED: "true"
           MAX_REPROCESS_JOBS: "20"
           MAX_AUTO_APPLY_PER_RUN: "100"
-          PIPELINE_MAX_RUN_SECONDS: "1500"
+          PIPELINE_MAX_RUN_SECONDS: "0"
           TECTONIC_TIMEOUT: "60"
           TELEGRAM_SEND_MANUAL_APPLY_ALERTS: "false"
 
