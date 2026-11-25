@@ -18,7 +18,15 @@ LOGIN_REQUIRED_AGGREGATORS = (
     "ziprecruiter.com",
     "wellfound.com",
     "angel.co",
-    "flexjobs.com"
+    "flexjobs.com",
+    "metacareers.com",
+    "builtin.com",
+    "jobicy.com",
+)
+
+LOGIN_REQUIRED_URL_PATTERNS = (
+    "google.com/about/careers",
+    "careers.google.com",
 )
 
 class AutoApplyDispatcher:
@@ -69,8 +77,8 @@ class AutoApplyDispatcher:
         if "jobs.lever.co" in netloc:
             return "LEVER"
         
-        # Aggregator platforms requiring candidate account logins / 2FA cannot be auto-submitted via anonymous forms
-        if any(agg in netloc for agg in LOGIN_REQUIRED_AGGREGATORS):
+        # Aggregator / career portals requiring candidate account logins or unresolvable wrappers
+        if any(agg in netloc for agg in LOGIN_REQUIRED_AGGREGATORS) or any(pat in url for pat in LOGIN_REQUIRED_URL_PATTERNS):
             return "MANUAL_URL"
 
         return "BROWSER"

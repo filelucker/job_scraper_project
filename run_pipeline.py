@@ -458,7 +458,7 @@ def main():
             if dispatcher:
                 bst_tz = timezone(timedelta(hours=6))
                 appended_in_run_urls = set()
-                pipeline_max_run_seconds = int(os.getenv("PIPELINE_MAX_RUN_SECONDS", "900"))  # 15 mins default
+                pipeline_max_run_seconds = int(os.getenv("PIPELINE_MAX_RUN_SECONDS", "1500"))  # 25 mins default
                 send_manual_alerts = os.getenv("TELEGRAM_SEND_MANUAL_APPLY_ALERTS", "false").lower() in ("true", "1", "yes")
 
                 for idx, job in enumerate(jobs_to_apply):

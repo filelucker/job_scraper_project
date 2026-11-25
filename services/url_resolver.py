@@ -90,6 +90,16 @@ class UrlResolver:
                 extracted = cls._extract_from_glassdoor(url, timeout)
                 if extracted:
                     return extracted
+
+            if "builtin.com" in netloc:
+                extracted = cls._extract_from_builtin(url, timeout)
+                if extracted:
+                    return extracted
+
+            if "jobicy.com" in netloc:
+                extracted = cls._extract_from_jobicy(url, timeout)
+                if extracted:
+                    return extracted
             # General redirect resolver
             resolved_url = cls._follow_redirects(url, timeout)
             if cls.is_direct_ats(resolved_url):
@@ -417,6 +427,45 @@ class UrlResolver:
                     pass
         except Exception as e:
             print(f"[UrlResolver] Glassdoor extraction notice: {e}")
+        return None
+
+    @classmethod
+    def _extract_from_builtin(cls, url: str, timeout: int = 8) -> Optional[str]:
+        """Extracts direct ATS or external employer URL from BuiltIn job pages."""
+        return cls._extract_external_apply_link(url, aggregator_domain="builtin.com", timeout=timeout)
+
+    @classmethod
+    def _extract_from_jobicy(cls, url: str, timeout: int = 8) -> Optional[str]:
+        """Extracts direct ATS or external employer URL from Jobicy job pages."""
+        return cls._extract_external_apply_link(url, aggregator_domain="jobicy.com", timeout=timeout)
+
+    @classmethod
+    def _extract_external_apply_link(cls, url: str, aggregator_domain: str, timeout: int = 8) -> Optional[str]:
+        """Shared helper to unwrap aggregator pages (BuiltIn, Jobicy) to direct ATS or employer URLs."""
+        try:
+            session = requests.Session()
+            session.headers.update(DEFAULT_HEADERS)
+            resp = session.get(url, timeout=timeout)
+            if resp.status_code != 200:
+                return None
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for a in soup.find_all("a", href=True):
+                href = a["href"].strip()
+                if cls.is_direct_ats(href):
+                    return href
+
+            for script in soup.find_all("script", type="application/ld+json"):
+                try:
+                    data = json.loads(script.string or "")
+                    if isinstance(data, dict) and data.get("@type") == "JobPosting":
+                        direct = data.get("directApply") or data.get("url")
+                        if isinstance(direct, str) and direct.startswith("http") and aggregator_domain not in direct.lower():
+                            return direct
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[UrlResolver] {aggregator_domain} extraction notice: {e}")
         return None
 
     @classmethod

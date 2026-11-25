@@ -409,5 +409,39 @@ class TestAutoApplyPipeline(unittest.TestCase):
             self.assertFalse(res["success"])
             self.assertEqual(res["status"], "Requires Manual Apply (Submission Unconfirmed)")
 
+    def test_12_login_portal_skip_and_aggregator_unwrapping(self):
+        from unittest.mock import patch, MagicMock
+        from services.url_resolver import UrlResolver
+
+        dispatcher = AutoApplyDispatcher(mode="auto")
+
+        # 1. Google Careers and Meta Careers skip Playwright immediately as MANUAL_URL
+        self.assertEqual(
+            dispatcher.detect_channel({"URL": "https://www.google.com/about/careers/applications/jobs/results/123"}),
+            "MANUAL_URL"
+        )
+        self.assertEqual(
+            dispatcher.detect_channel({"URL": "https://www.metacareers.com/jobs/980479324710261/"}),
+            "MANUAL_URL"
+        )
+        # Unresolved BuiltIn / Jobicy also skip Playwright immediately
+        self.assertEqual(
+            dispatcher.detect_channel({"URL": "https://builtin.com/job/senior-android-engineer/12443366"}),
+            "MANUAL_URL"
+        )
+        self.assertEqual(
+            dispatcher.detect_channel({"URL": "https://jobicy.com/jobs/163946-mobile-engineer-ai-finance-agent"}),
+            "MANUAL_URL"
+        )
+
+        # 2. BuiltIn / Jobicy unwrap cleanly when a direct ATS link is present
+        builtin_html = '<html><body><a href="https://job-boards.greenhouse.io/acme/jobs/999">Apply Now</a></body></html>'
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = builtin_html
+        with patch("requests.Session.get", return_value=mock_resp):
+            resolved = UrlResolver.resolve("https://builtin.com/job/senior-android-engineer/12443366")
+            self.assertEqual(resolved, "https://job-boards.greenhouse.io/acme/jobs/999")
+
 if __name__ == "__main__":
     unittest.main()
