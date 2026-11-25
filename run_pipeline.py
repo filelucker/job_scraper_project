@@ -38,7 +38,10 @@ from config import (
     SENDER_NAME,
     GEMINI_API_KEY,
     OPENAI_API_KEY,
-    DRY_RUN
+    DRY_RUN,
+    OFFICIAL_APIS_ONLY,
+    DIRECT_API_AND_EMAIL_ONLY,
+    GATED_SCRAPER_ATS_TYPES,
 )
 from handlers import (
     GreenhouseHandler, LeverHandler, FallbackHandler, AshbyHandler,
@@ -175,6 +178,11 @@ def fetch_board(company_name: str, board_config: dict):
     # Skip scrapers known to be blocked by cloud anti-bot/WAFs or rate limits to prevent hangs and log spam
     if ats_type in ("jobsch", "flexjobs", "programathor", "wanted", "jobs_cz") and not os.getenv("ENABLE_UNSTABLE_AGGREGATORS"):
         print(f"[{company_name}] Info: Scraper is disabled by default due to cloud anti-bot/WAF blocking. Skipping board.", file=sys.stderr)
+        return company_name, [], "skipped", None
+
+    # Skip non-API / anti-bot-gated portals when OFFICIAL_APIS_ONLY is enabled
+    if OFFICIAL_APIS_ONLY and ats_type in GATED_SCRAPER_ATS_TYPES:
+        print(f"[{company_name}] Info: Skipping non-API/gated portal '{ats_type}' (OFFICIAL_APIS_ONLY=true).", file=sys.stderr)
         return company_name, [], "skipped", None
 
     # Skip extremely heavy national public-sector aggregators by default to prevent long runs or hangs
@@ -446,7 +454,8 @@ def main():
                         "user": SMTP_USER,
                         "password": SMTP_PASSWORD,
                         "sender_name": SENDER_NAME
-                    }
+                    },
+                    api_email_only=DIRECT_API_AND_EMAIL_ONLY,
                 )
             except Exception as init_err:
                 print(f"[Auto-Apply] Error initializing dispatcher: {init_err}", file=sys.stderr)
@@ -651,7 +660,10 @@ def main():
                 if unapplied_jobs:
                     print(f"[Auto-Apply] Found {len(unapplied_jobs)} unapplied job(s) in sheet. Processing...")
                     if not dispatcher:
-                        dispatcher = AutoApplyDispatcher(mode=AUTO_APPLY_MODE)
+                        dispatcher = AutoApplyDispatcher(
+                            mode=AUTO_APPLY_MODE,
+                            api_email_only=DIRECT_API_AND_EMAIL_ONLY,
+                        )
                     for ujob in unapplied_jobs:
                         u_url = ujob.get("URL", "")
                         u_company = ujob.get("Company", "Company")

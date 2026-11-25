@@ -828,5 +828,22 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(job.title, "Senior iOS Developer")
         self.assertEqual(job.location, "Berlin")
 
+    def test_official_apis_only_gating_in_fetch_board(self):
+        from unittest.mock import patch
+        import run_pipeline
+
+        with patch.object(run_pipeline, "OFFICIAL_APIS_ONLY", True):
+            for gated_ats in ("indeed", "linkedin", "wellfound", "workday"):
+                company, jobs, status, err = run_pipeline.fetch_board("GatedCo", {"ats": gated_ats, "token": "*"})
+                self.assertEqual(status, "skipped", f"Expected {gated_ats} to be skipped in OFFICIAL_APIS_ONLY mode")
+                self.assertEqual(jobs, [])
+                self.assertIsNone(err)
+
+            # Official API board should still invoke its handler
+            with patch.object(run_pipeline.GreenhouseHandler, "execute", return_value=[]):
+                company, jobs, status, err = run_pipeline.fetch_board("Stripe", {"ats": "greenhouse", "token": "stripe"})
+                self.assertEqual(status, "scanned")
+                self.assertIsNone(err)
+
 if __name__ == "__main__":
     unittest.main()

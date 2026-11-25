@@ -29,7 +29,7 @@ Matches and application statuses are synced in real time to **Google Sheets** wi
   - `JOB_LOOKBACK_HOURS`: Publication window (default: `6` hours).
   - `ONLY_REMOTE_OR_HYBRID`: Geography filter restricting matches to remote, hybrid, EU, or UAE locations.
   - `COMPANY_BOARDS`: Dictionary of 2,907+ companies mapped to ATS platform types and public board slugs (e.g. Greenhouse board slug `reddit`, Lever slug `anyscale`).
-  - Runtime flags: `AUTO_APPLY_ENABLED`, `AUTO_APPLY_MODE` (`auto`, `review`, `dry_run`), `BROWSER_HEADLESS`, `DRY_RUN`, `OBSCURA_CDP_URL` (optional external CDP browser endpoint).
+  - Runtime flags: `AUTO_APPLY_ENABLED`, `AUTO_APPLY_MODE` (`auto`, `review`, `dry_run`), `OFFICIAL_APIS_ONLY`, `DIRECT_API_AND_EMAIL_ONLY`, `BROWSER_HEADLESS`, `DRY_RUN`, `OBSCURA_CDP_URL` (optional external CDP browser endpoint).
 
 ### Local Invariants
 
@@ -53,7 +53,7 @@ Matches and application statuses are synced in real time to **Google Sheets** wi
 
 ## Global Invariants
 
-- **Verified Submission Statuses**: Every application attempt is categorized by genuine verified outcome. Applications only receive `Applied (Greenhouse API)`, `Applied (Lever API)`, `Applied (Direct Email)`, or `Applied (Web Portal)` when positive confirmation is validated (URL redirect, DOM success message, or HTTP 200/201 ATS API response). Login-gated aggregators (Indeed, LinkedIn, Glassdoor), security code challenges without IMAP, or CAPTCHA-gated forms receive `Requires Manual Apply (...)` with a tailored CV and 1-click apply card dispatched to Telegram. In `review` mode, processed applications receive `Drafted (Preview Generated)`.
+- **Verified Submission Statuses**: Every application attempt is categorized by genuine verified outcome. Applications only receive `Applied (Greenhouse API)`, `Applied (Lever API)`, `Applied (Direct Email)`, or `Applied (Web Portal)` when positive confirmation is validated (URL redirect, DOM success message, or HTTP 200/201 ATS API response). When `OFFICIAL_APIS_ONLY=true` (default), non-API/gated scrapers (`indeed`, `linkedin`, `wellfound`, `workday`, etc.) are skipped in favor of official ATS APIs and public job feeds/RSS. When `DIRECT_API_AND_EMAIL_ONLY=true` (default), auto-apply submits strictly via direct ATS APIs (`GreenhouseApplier`, `LeverApplier`) and `EmailRouter`, routing login-gated portals and web-only forms to `Requires Manual Apply (...)` with a tailored CV and 1-click apply card dispatched to Telegram. In `review` mode, processed applications receive `Drafted (Preview Generated)`.
 - **Strict Deduplication**: All discovered job listings must be normalized and deduplicated across existing Google Sheets records, local state cache (`scraped_jobs.json`), and the active run batch before queueing for auto-apply.
 - **CI Runtime Safety Guard**: `PIPELINE_MAX_RUN_SECONDS` defaults to `0` (disabled) so the full batch processes to completion within the 180-minute GitHub Actions runner ceiling. If set to a positive integer, remaining unapplied jobs receive `Pending (Batch Time Limit - Unprocessed)` without stamping an unverified application timestamp.
 - **Compiler Circuit Breaker**: `LatexCompiler` limits Tectonic compilation to 15 seconds. If a timeout occurs or Tectonic is unavailable, further compilation attempts for the run are disabled, falling back to [`master_resume.pdf`](./master_resume.pdf) to preserve execution budget.
@@ -117,7 +117,7 @@ job_scraper_project/
 │   └── README.md
 ├── templates/
 │   └── resume_template.tex         # Master LaTeX CV template
-├── tests/                          # 66 unit tests across pipeline, auto-apply, stealth, resolver, and solver suites
+├── tests/                          # 69 unit tests across pipeline, auto-apply, stealth, resolver, and solver suites
 │   ├── test_pipeline.py
 │   ├── test_auto_apply.py
 │   ├── test_automation.py
@@ -186,6 +186,10 @@ SMTP_PORT=587
 SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_gmail_app_password
 SENDER_NAME="Md Moniruzzaman"
+
+# Official API / Feed Mode & Direct Email Routing
+OFFICIAL_APIS_ONLY=true                   # Skip gated scrapers; scan official ATS APIs & public feeds/RSS only
+DIRECT_API_AND_EMAIL_ONLY=true            # Submit via Greenhouse/Lever APIs & SMTP Email only; manual fallback for web forms
 
 # Anti-Bot & Browser Automation
 BROWSER_HEADLESS=true

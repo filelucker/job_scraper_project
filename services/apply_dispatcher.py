@@ -22,6 +22,8 @@ LOGIN_REQUIRED_AGGREGATORS = (
     "metacareers.com",
     "builtin.com",
     "jobicy.com",
+    "myworkdayjobs.com",
+    "workday.com",
 )
 
 LOGIN_REQUIRED_URL_PATTERNS = (
@@ -37,10 +39,12 @@ class AutoApplyDispatcher:
         mode: Optional[str] = None,  # "auto", "review", "dry_run"
         gemini_api_key: Optional[str] = None,
         openai_api_key: Optional[str] = None,
-        smtp_config: Optional[Dict[str, Any]] = None
+        smtp_config: Optional[Dict[str, Any]] = None,
+        api_email_only: bool = False,
     ):
         self.mode = mode or AUTO_APPLY_MODE
         self.dry_run = (self.mode in ("dry_run", "review"))
+        self.api_email_only = api_email_only
         self.tailor = ResumeTailor(gemini_api_key=gemini_api_key, openai_api_key=openai_api_key)
         self.compiler = LatexCompiler()
         self.greenhouse_applier = GreenhouseApplier(dry_run=self.dry_run)
@@ -64,6 +68,16 @@ class AutoApplyDispatcher:
             dry_run=self.dry_run
         )
 
+    @staticmethod
+    def _is_login_required(url: str) -> bool:
+        """Return True if the URL belongs to a login-gated portal or aggregator."""
+        url_lower = (url or "").lower()
+        netloc = (urlparse(url_lower).netloc or "").lower()
+        return (
+            any(agg in netloc for agg in LOGIN_REQUIRED_AGGREGATORS)
+            or any(pat in url_lower for pat in LOGIN_REQUIRED_URL_PATTERNS)
+        )
+
     def detect_channel(self, job: Dict[str, Any], target_url: Optional[str] = None) -> str:
         """Identify the best application channel for a job."""
         url = (target_url or job.get("URL") or "").lower()
@@ -76,9 +90,13 @@ class AutoApplyDispatcher:
             return "GREENHOUSE"
         if "jobs.lever.co" in netloc:
             return "LEVER"
-        
+
         # Aggregator / career portals requiring candidate account logins or unresolvable wrappers
-        if any(agg in netloc for agg in LOGIN_REQUIRED_AGGREGATORS) or any(pat in url for pat in LOGIN_REQUIRED_URL_PATTERNS):
+        if self._is_login_required(url):
+            return "MANUAL_URL"
+
+        # In API/email-only mode, route remaining web forms directly to manual review
+        if self.api_email_only:
             return "MANUAL_URL"
 
         return "BROWSER"
@@ -125,19 +143,26 @@ class AutoApplyDispatcher:
             elif self.compiler.tectonic_bin and not getattr(self.compiler, 'compilation_failed', False):
                 self.compiler.compile_pdf(self.compiler.render_latex(), pdf_path)
 
-        # 3. Handle Aggregator / Login-required platforms
+        # 3. Handle Aggregator / Login-required or API/Email-only Manual Fallback platforms
         if channel == "MANUAL_URL":
-            print(f"[AutoApplyDispatcher] Aggregator platform requires candidate login/2FA ({target_url}). Tailored CV generated; dispatching to Telegram for 1-click manual apply.")
+            if self._is_login_required(target_url):
+                status_text = "Requires Manual Apply (Login Required)"
+                notice_text = "Aggregator platform requires direct candidate login. Tailored CV dispatched."
+                print(f"[AutoApplyDispatcher] Aggregator platform requires candidate login/2FA ({target_url}). Tailored CV generated; dispatching to Telegram for 1-click manual apply.")
+            else:
+                status_text = "Requires Manual Apply (Manual Browser Action)"
+                notice_text = "Direct API/Email-only mode enabled. Tailored CV and direct link dispatched for manual submission."
+                print(f"[AutoApplyDispatcher] Direct API/Email-only mode: routing web form ({target_url}) to manual review with tailored CV.")
             return {
                 "channel": channel,
                 "success": False,
                 "pdf_path": pdf_path,
-                "status": "Requires Manual Apply (Login Required)",
+                "status": status_text,
                 "screenshot_path": None,
-                "details": {"notice": "Aggregator platform requires direct candidate login. Tailored CV dispatched."}
+                "details": {"notice": notice_text}
             }
 
-        # 4. Route to specific channel with resilient fallback to browser
+        # 4. Route to specific channel with resilient fallback to browser (unless api_email_only is enabled)
         result = {}
         if channel == "GREENHOUSE":
             res = self.greenhouse_applier.apply(
@@ -145,8 +170,8 @@ class AutoApplyDispatcher:
                 pdf_path=pdf_path,
                 cover_letter=tailored.get("email_body_text")
             )
-            # If direct API fails, escalate to browser applier to apply via web
-            if not res.get("success") and not self.dry_run:
+            # If direct API fails, escalate to browser applier unless running in API/email-only mode
+            if not res.get("success") and not self.dry_run and not self.api_email_only:
                 print(f"[AutoApplyDispatcher] Greenhouse direct API did not complete ({res.get('error')}). Escalating to Playwright browser applier...")
                 browser_res = self.browser_applier.apply(
                     job_url=target_url,
@@ -185,8 +210,8 @@ class AutoApplyDispatcher:
                 pdf_path=pdf_path,
                 comments=tailored.get("email_body_text")
             )
-            # If direct API fails, escalate to browser applier to apply via web
-            if not res.get("success") and not self.dry_run:
+            # If direct API fails, escalate to browser applier unless running in API/email-only mode
+            if not res.get("success") and not self.dry_run and not self.api_email_only:
                 print(f"[AutoApplyDispatcher] Lever direct API did not complete ({res.get('error')}). Escalating to Playwright browser applier...")
                 browser_res = self.browser_applier.apply(
                     job_url=target_url,
@@ -229,8 +254,8 @@ class AutoApplyDispatcher:
                 pdf_path=pdf_path,
                 attachment_filename=f"Md_Moniruzzaman_Resume_{safe_company}.pdf"
             )
-            # If email fails and target URL is available, attempt web application
-            if not res.get("success") and target_url and not self.dry_run:
+            # If email fails and target URL is available, attempt web application unless running in API/email-only mode
+            if not res.get("success") and target_url and not self.dry_run and not self.api_email_only:
                 print(f"[AutoApplyDispatcher] Direct email delivery failed. Escalating to Playwright browser applier on URL: {target_url}...")
                 browser_res = self.browser_applier.apply(
                     job_url=target_url,

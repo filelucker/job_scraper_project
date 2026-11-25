@@ -3183,7 +3183,28 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("true", "1", "yes")
 
-# Anti-Bot & CAPTCHA Solver Configuration
+# Anti-Bot & Official API Mode Configuration
+# When true, skip non-API / anti-bot-gated scrapers (Indeed, LinkedIn, Wellfound, Workday, etc.)
+# and scan only official ATS APIs and public job feeds/RSS.
+OFFICIAL_APIS_ONLY = os.getenv("OFFICIAL_APIS_ONLY", "true").lower() in ("true", "1", "yes")
+GATED_SCRAPER_ATS_TYPES = (
+    "indeed",
+    "linkedin",
+    "wellfound",
+    "workday",
+    "google",
+    "meta",
+    "amazon",
+    "apple",
+    "tiktok",
+    "uber",
+    "tesla",
+    "eightfold",
+)
+# When true, AutoApplyDispatcher only auto-submits via official ATS APIs (Greenhouse/Lever) and SMTP Email,
+# routing other portals or failed API calls directly to manual Telegram/Sheets review without browser automation.
+DIRECT_API_AND_EMAIL_ONLY = os.getenv("DIRECT_API_AND_EMAIL_ONLY", "true").lower() in ("true", "1", "yes")
+
 CAPSOLVER_API_KEY = os.getenv("CAPSOLVER_API_KEY", "")
 TWOCAPTCHA_API_KEY = os.getenv("TWOCAPTCHA_API_KEY", "")
 _is_headless_env = (sys.platform.startswith("linux") and not os.getenv("DISPLAY")) or bool(os.getenv("CI") or os.getenv("GITHUB_ACTIONS"))

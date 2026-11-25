@@ -5,6 +5,7 @@ The `services` component package provides application execution, document genera
 
 ## Interface
 - `class AutoApplyDispatcher`: Central routing and application manager (`apply_dispatcher.py`).
+  - `__init__(mode=None, gemini_api_key=None, openai_api_key=None, smtp_config=None, api_email_only=False)`: Supports `api_email_only=True` to restrict automated submissions to official ATS APIs and SMTP Email while routing web forms to `MANUAL_URL`.
   - `detect_channel(job: Dict[str, Any], target_url: Optional[str] = None) -> str`: Identifies channel (`EMAIL`, `GREENHOUSE`, `LEVER`, `MANUAL_URL`, `BROWSER`).
   - `process_job(job: Dict[str, Any]) -> Dict[str, Any]`: Tailors resume, compiles PDF, executes application attempt, and returns verified status dictionary (`success`, `channel`, `pdf_path`, `status`, `screenshot_path`, `details`).
 - `class GreenhouseApplier`: Headless Greenhouse candidate submission engine (`apply_greenhouse.py`).

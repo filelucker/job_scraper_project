@@ -56,7 +56,9 @@ jobs:
       - name: Execute Pipeline
         timeout-minutes: 170
         env:
-          # Playwright & Headless Config
+          # Pipeline & Official API Mode Config
+          OFFICIAL_APIS_ONLY: "true"
+          DIRECT_API_AND_EMAIL_ONLY: "true"
           BROWSER_HEADLESS: "true"
           JOB_LOOKBACK_HOURS: "12"
           AUTO_APPLY_REPROCESS_UNAPPLIED: "true"

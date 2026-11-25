@@ -443,5 +443,49 @@ class TestAutoApplyPipeline(unittest.TestCase):
             resolved = UrlResolver.resolve("https://builtin.com/job/senior-android-engineer/12443366")
             self.assertEqual(resolved, "https://job-boards.greenhouse.io/acme/jobs/999")
 
+    def test_13_api_email_only_mode_and_workday_manual_fallback(self):
+        from unittest.mock import patch
+
+        dispatcher = AutoApplyDispatcher(mode="auto", api_email_only=True)
+
+        # 1. Workday candidate portals always require account login -> MANUAL_URL
+        workday_job = {
+            "Title": "Senior Mobile Engineer",
+            "Company": "eBay",
+            "URL": "https://ebay.wd5.myworkdayjobs.com/en-US/apply/job/Senior-Mobile-Engineer_JR1234"
+        }
+        self.assertEqual(dispatcher.detect_channel(workday_job), "MANUAL_URL")
+        wd_res = dispatcher.process_job(workday_job)
+        self.assertFalse(wd_res["success"])
+        self.assertEqual(wd_res["status"], "Requires Manual Apply (Login Required)")
+
+        # 2. Non-API web portals route to manual review without invoking Playwright/CAPTCHA solver
+        web_job = {
+            "Title": "Senior Android Engineer",
+            "Company": "Instacart",
+            "URL": "https://www.ycombinator.com/companies/instacart/jobs/BWkbgeYsk-senior-android-engineer"
+        }
+        self.assertEqual(dispatcher.detect_channel(web_job), "MANUAL_URL")
+        with patch("services.apply_dispatcher.UrlResolver.resolve", return_value=web_job["URL"]), \
+             patch.object(dispatcher.browser_applier, "apply") as mock_browser:
+            web_res = dispatcher.process_job(web_job)
+            mock_browser.assert_not_called()
+            self.assertFalse(web_res["success"])
+            self.assertEqual(web_res["status"], "Requires Manual Apply (Manual Browser Action)")
+            self.assertTrue(os.path.exists(web_res["pdf_path"]))
+
+        # 3. Failed Greenhouse/Lever API calls do NOT escalate to Playwright in api_email_only mode
+        gh_job = {
+            "Title": "Android Engineer",
+            "Company": "Reddit",
+            "URL": "https://job-boards.greenhouse.io/reddit/jobs/8127002"
+        }
+        with patch.object(dispatcher.greenhouse_applier, "apply", return_value={"success": False, "error": "400 Bad Request"}), \
+             patch.object(dispatcher.browser_applier, "apply") as mock_browser:
+            gh_res = dispatcher.process_job(gh_job)
+            mock_browser.assert_not_called()
+            self.assertFalse(gh_res["success"])
+            self.assertIn("Requires Manual Apply", gh_res["status"])
+
 if __name__ == "__main__":
     unittest.main()
